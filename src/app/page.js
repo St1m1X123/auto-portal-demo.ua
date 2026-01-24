@@ -1,31 +1,30 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import BrandGrid from '@/components/BrandGrid';
 import ModelGrid from '@/components/ModelGrid';
 import CategoryGrid from '@/components/CategoryGrid';
 import ProductGrid from '@/components/ProductGrid';
 import QuickSearch from '@/components/QuickSearch';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
 
-export default function Home() {
-  // Міняємо на null, щоб спочатку бачити BrandGrid. Якщо треба тільки Opel — поверни 'OPEL'
+// 1. Створюємо окремий компонент для контенту
+function AutoPortalContent() {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
   const searchParams = useSearchParams();
-  const searchQuery = searchParams.get('search'); // Отримуємо запит з URL (?search=...)
+  const searchQuery = searchParams.get('search'); 
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // --- ПОКРАЩЕНІ ФУНКЦІЇ ПЕРЕМИКАННЯ ---
+  // --- ФУНКЦІЇ ПЕРЕМИКАННЯ ---
   const handleSelectBrand = (name) => {
     setIsTransitioning(true);
     setTimeout(() => {
       setSelectedBrand(name);
-      setSelectedModel(null); // Обов'язково скидаємо модель при зміні марки
-      setSelectedCategory(null); // Скидаємо категорію
+      setSelectedModel(null);
+      setSelectedCategory(null);
       setIsTransitioning(false);
     }, 150);
   };
@@ -34,7 +33,7 @@ export default function Home() {
     setIsTransitioning(true);
     setTimeout(() => {
       setSelectedModel(name);
-      setSelectedCategory(null); // Скидаємо категорію, щоб показати CategoryGrid
+      setSelectedCategory(null);
       setIsTransitioning(false);
     }, 150);
   };
@@ -47,13 +46,12 @@ export default function Home() {
     }, 150);
   };
 
-  // --- ФУНКЦІЇ "НАЗАД" ---
   const handleResetToBrands = () => { setIsTransitioning(true); setTimeout(() => { setSelectedBrand(null); setSelectedModel(null); setSelectedCategory(null); setIsTransitioning(false); }, 150); };
   const handleResetToModels = () => { setIsTransitioning(true); setTimeout(() => { setSelectedModel(null); setSelectedCategory(null); setIsTransitioning(false); }, 150); };
   const handleResetToCategories = () => { setIsTransitioning(true); setTimeout(() => { setSelectedCategory(null); setIsTransitioning(false); }, 150); };
 
   return (
-    <Suspense fallback={<div className="bg-gray-50 text-slate-900 font-sans min-h-screen">
+    <div className="bg-gray-50 text-slate-900 font-sans min-h-screen">
       <main>
         {/* Хедер / Hero */}
         <section className="py-16 px-4 bg-white border-b border-gray-100">
@@ -67,9 +65,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ПЕРЕВІРКА: ПОШУК ЧИ ПЛИТКИ */}
         {searchQuery ? (
-          /* --- ЕКРАН РЕЗУЛЬТАТІВ ПОШУКУ --- */
           <section className="py-12 px-4">
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center justify-between mb-8">
@@ -83,18 +79,12 @@ export default function Home() {
                   ✕ Закрити пошук
                 </button>
               </div>
-              
-              {/* Передаємо пошуковий запит у ProductGrid */}
-              <ProductGrid 
-                categoryName="Всі запчастини" 
-                globalSearchQuery={searchQuery} 
-              />
+              <ProductGrid categoryName="Всі запчастини" globalSearchQuery={searchQuery} />
             </div>
           </section>
         ) : (
-          /* --- ТВОЯ ЗВИЧАЙНА ЛОГІКА (QuickSearch + Плитки) --- */
           <>
-            <QuickSearch onSearch={(brand, model, cat, part) => {
+            <QuickSearch onSearch={(brand, model, cat) => {
               setIsTransitioning(true);
               setTimeout(() => {
                 setSelectedBrand(brand);
@@ -104,7 +94,6 @@ export default function Home() {
               }, 150);
             }} />
 
-            {/* ХЛІБНІ КРИХТИ */}
             <div className="max-w-6xl mx-auto px-4 py-4">
               <nav className="text-xs sm:text-sm font-bold flex flex-wrap items-center gap-1 sm:gap-2 text-slate-400 uppercase tracking-widest">
                 <button onClick={handleResetToBrands} className={`hover:text-blue-600 transition ${!selectedBrand ? 'text-blue-600' : ''}`}>
@@ -122,7 +111,6 @@ export default function Home() {
               </nav>
             </div>
 
-            {/* ПЕРЕМИКАННЯ СІТОК */}
             <div className={`transition-opacity duration-300 min-h-[450px] ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
               {!selectedBrand ? (
                 <BrandGrid onSelectBrand={handleSelectBrand} />
@@ -147,7 +135,6 @@ export default function Home() {
           </>
         )}
 
-        {/* Блок переваг */}
         <section className="py-16 px-4 bg-white border-t border-gray-200 mt-12">
           <div className="max-w-7xl mx-auto text-center">
             <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Чому ми?</p>
@@ -155,6 +142,14 @@ export default function Home() {
         </section>
       </main>
     </div>
-</Suspense>
+  );
+}
+
+// 2. Головний компонент сторінки тепер лише обгортка
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="p-20 text-center font-bold text-slate-400 uppercase tracking-widest">Завантаження порталу...</div>}>
+      <AutoPortalContent />
+    </Suspense>
   );
 }
