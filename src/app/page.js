@@ -7,6 +7,7 @@ import CategoryGrid from '@/components/CategoryGrid';
 import ProductGrid from '@/components/ProductGrid';
 import QuickSearch from '@/components/QuickSearch';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 export default function Home() {
   // Міняємо на null, щоб спочатку бачити BrandGrid. Якщо треба тільки Opel — поверни 'OPEL'
@@ -52,7 +53,7 @@ export default function Home() {
   const handleResetToCategories = () => { setIsTransitioning(true); setTimeout(() => { setSelectedCategory(null); setIsTransitioning(false); }, 150); };
 
   return (
-    <div className="bg-gray-50 text-slate-900 font-sans min-h-screen">
+    <Suspense fallback={<div className="bg-gray-50 text-slate-900 font-sans min-h-screen">
       <main>
         {/* Хедер / Hero */}
         <section className="py-16 px-4 bg-white border-b border-gray-100">
@@ -154,5 +155,6 @@ export default function Home() {
         </section>
       </main>
     </div>
+</Suspense>
   );
 }
