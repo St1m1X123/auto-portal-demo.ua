@@ -30,9 +30,67 @@ export const subcategoriesData = {
   'default': ['Всі', 'Інше']
 };
 
-// Додаємо експорт тестових товарів
+// ... зверху твої brands, models, categories (їх не чіпаємо) ...
+
 export const dummyProducts = [
-  { id: 1, name: 'Бампер передній Opel Astra H (дорестайл)', oe: 'GM 93186254', cat: 'Кузов та скло', subcat: 'Бампери', price: '3 500 ₴', condition: 'Б/В Оригінал', image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Bumper' },
-  { id: 2, name: 'Двигун Z16XEP 1.6 Twinport', oe: 'Z16XEP 12345678', cat: 'Двигун та навісне', subcat: 'Двигун в зборі', price: '22 000 ₴', condition: 'Перевірений', image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Engine' },
-  { id: 3, name: 'Генератор Bosch 100A Opel Vectra C', oe: '0124425020', cat: 'Двигун та навісне', subcat: 'Генератори', price: '1 800 ₴', condition: 'Б/В Оригінал', image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Generator' },
+  { 
+    id: 1, 
+    name: 'Бампер передній Opel Astra H (дорестайл)', 
+    oe: 'GM 93186254', 
+    cat: 'Кузов та скло', 
+    subcat: 'Бампери', 
+    price: '3 500 ₴', 
+    condition: 'Б/В Оригінал', 
+    image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Bumper+Astra' 
+  },
+  { 
+    id: 2, 
+    name: 'Турбіна Opel Astra H 1.7 CDTI', 
+    oe: '49173-06501', 
+    cat: 'Двигун та навісне', 
+    subcat: 'Турбіни', 
+    price: '8 500 ₴', 
+    condition: 'Вживане', 
+    image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Turbine' 
+  },
+  { 
+    id: 3, 
+    name: 'Фара права (Xenon) Opel Insignia A', 
+    oe: '13226784', 
+    cat: 'Оптика та освітлення', 
+    subcat: 'Фари передні', 
+    price: '12 400 ₴', 
+    condition: 'Б/В Оригінал', 
+    image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Headlight' 
+  },
+  { 
+    id: 4, 
+    name: 'Датчик ABS задній Opel Zafira B', 
+    oe: '93192439', 
+    cat: 'Гальмівна система', 
+    subcat: 'Блоки ABS', // або 'Датчики' якщо є така підкатегорія
+    price: '450 ₴', 
+    condition: 'Вживане', 
+    image: 'https://placehold.co/400x300/e2e8f0/64748b?text=ABS+Sensor' 
+  },
+  { 
+    id: 5, 
+    name: 'Генератор 120A Opel Astra J 1.6', 
+    oe: '13500582', 
+    cat: 'Двигун та навісне', 
+    subcat: 'Генератори', 
+    price: '3 200 ₴', 
+    condition: 'Перевірений', 
+    image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Generator' 
+  },
+  { 
+    id: 6, 
+    name: 'Блок керування двигуном (ECU) Astra H', 
+    oe: '55562549', 
+    cat: 'Електрообладнання', 
+    subcat: 'Блоки управління (ЕБУ)', 
+    price: '5 600 ₴', 
+    condition: 'Вживане', 
+    image: 'https://placehold.co/400x300/e2e8f0/64748b?text=ECU+Unit' 
+  }
 ];
