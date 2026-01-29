@@ -39,7 +39,7 @@ export const dummyProducts = [
     oe: 'GM 93186254', 
     cat: 'Кузов та скло', 
     subcat: 'Бампери', 
-    price: '3 500 ₴', 
+    price: '3 500 грн', 
     condition: 'Б/В Оригінал', 
     image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Bumper+Astra' 
   },
@@ -49,7 +49,7 @@ export const dummyProducts = [
     oe: '49173-06501', 
     cat: 'Двигун та навісне', 
     subcat: 'Турбіни', 
-    price: '8 500 ₴', 
+    price: '8 500 грн', 
     condition: 'Вживане', 
     image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Turbine' 
   },
@@ -59,7 +59,7 @@ export const dummyProducts = [
     oe: '13226784', 
     cat: 'Оптика та освітлення', 
     subcat: 'Фари передні', 
-    price: '12 400 ₴', 
+    price: '12 400 грн', 
     condition: 'Б/В Оригінал', 
     image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Headlight' 
   },
@@ -69,7 +69,7 @@ export const dummyProducts = [
     oe: '93192439', 
     cat: 'Гальмівна система', 
     subcat: 'Блоки ABS', // або 'Датчики' якщо є така підкатегорія
-    price: '450 ₴', 
+    price: '450 грн', 
     condition: 'Вживане', 
     image: 'https://placehold.co/400x300/e2e8f0/64748b?text=ABS+Sensor' 
   },
@@ -79,7 +79,7 @@ export const dummyProducts = [
     oe: '13500582', 
     cat: 'Двигун та навісне', 
     subcat: 'Генератори', 
-    price: '3 200 ₴', 
+    price: '3 200 грн', 
     condition: 'Перевірений', 
     image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Generator' 
   },
@@ -89,7 +89,7 @@ export const dummyProducts = [
     oe: '55562549', 
     cat: 'Електрообладнання', 
     subcat: 'Блоки управління (ЕБУ)', 
-    price: '5 600 ₴', 
+    price: '5 600 грн', 
     condition: 'Вживане', 
     image: 'https://placehold.co/400x300/e2e8f0/64748b?text=ECU+Unit' 
   }

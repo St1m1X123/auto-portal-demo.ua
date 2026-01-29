@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import Link from 'next/link'; // <--- 1. Додали імпорт для посилань
 import { subcategoriesData, dummyProducts } from '../utils/inventoryData';
+import { useCart } from '@/context/CartContext';
 
 export default function ProductGrid({ categoryName, globalSearchQuery, onBack, hideHeader = false }) {
+    const { addToCart } = useCart();
     const [activeChip, setActiveChip] = useState('Всі');
     const [isExpanded, setIsExpanded] = useState(false);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
 
     // 1. СПОЧАТКУ РОЗРАХУНОК
     const isAllPartsMode = categoryName === 'Всі запчастини';
@@ -21,6 +25,10 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
 
         return categoryMatch && subcatMatch && matchesSearch;
     });
+    const handleBuyClick = (product) => {
+        setSelectedProduct(product);
+        setShowModal(true);
+    };
 
     // 2. ВИВЕДЕННЯ
     return (
@@ -83,7 +91,7 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredProducts.map((product) => (
                             <div key={product.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-lg transition-all flex flex-col group">
-                                
+
                                 {/* 2. ФОТО ТЕПЕР ПОСИЛАННЯ */}
                                 <Link href={`/product/${product.id}`} className="block">
                                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden cursor-pointer">
@@ -117,26 +125,39 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                                     </div>
 
                                     <div className="mt-auto">
-                                        <div className="flex items-end justify-between mb-4">
+                                        {/* ЦЕННИК: Синяя цена в грн и зеленый статус */}
+                                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 mb-3 flex items-center justify-between">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase">Ціна</span>
-                                                <span className="text-xl font-black text-slate-900 leading-none">{product.price}</span>
+                                                {/* Фарбуємо в синій, а "грн" підтягнеться з даних автоматично */}
+                                                <span className="text-xl font-black text-blue-600 leading-none">{product.price}</span>
                                             </div>
+                                            <span className="text-[9px] font-black text-emerald-600 uppercase bg-white px-2 py-1 rounded-lg border border-emerald-100 shadow-sm">
+                                                В наявності
+                                            </span>
                                         </div>
 
                                         <div className="flex gap-2">
-                                            {/* 4. КНОПКА "КУПИТИ" ТЕЖ ВЕДЕ НА ТОВАР */}
-                                            <Link href={`/product/${product.id}`} className="flex-grow">
-                                                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-md shadow-blue-100">
+                                            {/* Кнопка Купить */}
+                                            <div className="flex-grow">
+                                                <button
+                                                    onClick={() => handleBuyClick(product)}
+                                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-md shadow-blue-100 uppercase"
+                                                >
                                                     Купити
                                                 </button>
-                                            </Link>
-                                            
-                                            <button className="flex items-center justify-center w-11 h-11 border-2 border-green-500 text-green-500 rounded-xl hover:bg-green-500 hover:text-white transition-all active:scale-95" title="Написати у Viber">
-                                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M17.57 21a4.52 4.52 0 0 1-1.07-.13c-2.8-.73-5.5-2.65-7.7-5.54a14.7 14.7 0 0 1-3.2-6.1c-.26-1.12.06-2.22.88-3.04l.52-.52A2.3 2.3 0 0 1 8.54 5c.4 0 .78.15 1.07.44l2.12 2.12c.3.3.44.68.44 1.07s-.15.77-.44 1.07l-.65.65c.4.74.88 1.45 1.45 2.1a9.23 9.23 0 0 0 2.2 1.7l.6-.6c.3-.3.68-.44 1.07-.44s.77.15 1.07.44l2.12 2.12c.6.6.6 1.55 0 2.12l-.53.53a3.3 3.3 0 0 1-1.36.85z" />
+                                            </div>
+
+                                            {/* ЗЕЛЕНЫЙ ТЕЛЕФОН: Используем чистый SVG с зеленым цветом */}
+                                            <a
+                                                href={`tel:380681374018`}
+                                                className="flex items-center justify-center w-12 h-12 border-2 border-emerald-500 text-emerald-500 rounded-xl hover:bg-emerald-500 hover:text-white transition-all active:scale-95"
+                                                title="Зателефонувати"
+                                            >
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                                                 </svg>
-                                            </button>
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
@@ -145,6 +166,108 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                     </div>
                 )}
             </div>
+
+            {/* --- ОНОВЛЕНЕ МОДАЛЬНЕ ВІКНО: СИНЯ ЦІНА + ЗЕЛЕНИЙ СТАТУС --- */}
+            {showModal && selectedProduct && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 md:p-6 font-montserrat">
+                    {/* Фон із розмиттям */}
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowModal(false)} />
+
+                    {/* Контейнер вікна */}
+                    <div className="relative bg-white w-full max-w-5xl rounded-[2rem] md:rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300 max-h-[98vh] overflow-hidden flex flex-col md:flex-row">
+
+                        {/* ЛІВА ЧАСТИНА (Тільки для комп'ютера) */}
+                        <div className="hidden md:flex md:w-[35%] bg-slate-50 p-10 flex-col justify-center border-r border-slate-100">
+                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">Ваше замовлення</p>
+                            <div className="aspect-square w-full rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-100 mb-6">
+                                <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 uppercase leading-tight mb-2">{selectedProduct.name}</h3>
+                            <div className="flex items-center gap-2">
+                                {/* Тільки selectedProduct.price, без додавання " грн" */}
+                                <span className="text-2xl font-black text-blue-600 tracking-tighter">{selectedProduct.price}</span>
+                                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">В наявності</span>
+                            </div>
+                        </div>
+
+                        {/* ПРАВА ЧАСТИНА (Форма) */}
+                        <div className="w-full md:w-[65%] p-5 md:p-10 overflow-y-auto">
+
+                            {/* Мобільне прев'ю (ховається на десктопі) */}
+                            <div className="md:hidden flex items-center gap-3 mb-5 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="w-12 h-12 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-slate-100">
+                                    <img src={selectedProduct.image} alt="" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="overflow-hidden">
+                                    <h4 className="text-[11px] font-black text-slate-800 uppercase truncate">{selectedProduct.name}</h4>
+                                    {/* Тут теж прибираємо зайве " грн" */}
+                                    <p className="text-blue-600 font-black text-sm">{selectedProduct.price}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-5">
+                                {/* Секція 1: Контакти */}
+                                <div className="space-y-3">
+                                    <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest border-l-4 border-blue-600 pl-3">Контактні дані</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <input type="text" placeholder="Прізвище та Ім'я" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-blue-500 transition-all" />
+                                        <input type="tel" placeholder="Номер телефону" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-blue-500 transition-all" />
+                                    </div>
+                                </div>
+
+                                {/* Секція 2: Доставка */}
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest border-l-4 border-slate-200 pl-3">Доставка (Нова Пошта)</h4>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase italic">Необов'язково</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input type="text" placeholder="Місто" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-blue-500 transition-all" />
+                                        <input type="text" placeholder="Відділення №" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-blue-500 transition-all" />
+                                    </div>
+                                </div>
+
+                                {/* Секція 3: Примітка */}
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest border-l-4 border-slate-200 pl-3">Додаткова інформація</h4>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase italic">Необов'язково</span>
+                                    </div>
+                                    <textarea rows="1" placeholder="VIN-код або примітка..." className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-blue-500 transition-all resize-none"></textarea>
+                                </div>
+
+                                {/* Блок сумісності / консультації */}
+                                <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl">
+                                    <p className="text-[10px] text-emerald-700 font-bold leading-tight">
+                                        🤝 Бажаєте консультацію? Просто напишіть ім'я та телефон, і ми вам зателефонуємо, щоб допомогти з підбором!
+                                    </p>
+                                </div>
+
+                                {/* Кнопки */}
+                                <div className="flex flex-col gap-2 pt-2">
+                                    <button className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-blue-100 active:scale-95 hover:bg-blue-700 transition-all">
+                                        Підтвердити замовлення
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            addToCart(selectedProduct); // 1. Кладемо в кошик
+                                            setShowModal(false);        // 2. Закриваємо вікно
+                                        }}
+                                        className="w-full bg-white text-blue-600 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border border-blue-100 hover:bg-blue-50 transition-all"
+                                    >
+                                        Додати та продовжити вибір
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Кнопка закриття */}
+                        <button onClick={() => setShowModal(false)} className="absolute top-5 right-5 text-slate-300 hover:text-slate-500 transition-colors">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                </div>
+            )}
         </section>
     );
 }

@@ -8,8 +8,11 @@ import { dummyProducts } from '../utils/inventoryData';
 import ViberIcon from '@/components/icons/ViberIcon';
 import TelegramIcon from '@/components/icons/TelegramIcon';
 import WhatsAppIcon from '@/components/icons/WhatsAppIcon';
+import Link from 'next/link'; // <--- Додати
+import { useCart } from '@/context/CartContext'; // <--- Додати
 
 export default function Header() {
+  const { cart } = useCart();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -186,10 +189,19 @@ export default function Header() {
               </div>
             </div>
 
-            <button className="relative p-2.5 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-xl transition-all">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-              <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">0</span>
-            </button>
+            <Link href="/cart" className="relative p-2.5 bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 rounded-xl transition-all group">
+              {/* Иконка корзины (твоя, в виде пакета) */}
+              <svg className="w-6 h-6 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+
+              {/* Красная цифра (появляется только если есть товары) */}
+              {cart.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-in zoom-in">
+                  {cart.length}
+                </span>
+              )}
+            </Link>
           </div>
         </div>
       </div>
