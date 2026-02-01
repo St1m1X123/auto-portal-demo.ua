@@ -30,7 +30,7 @@ export default function ShippingPage() {
             </div>
             <div className="pt-4 border-t border-gray-50">
               <h3 className="font-black text-slate-800 uppercase text-sm mb-2">Самовивіз зі складу</h3>
-              <p>Ви можете особисто забрати запчастину за адресою: <strong>м. Горохів, вул. Шевченка, 55</strong>. Перед візитом обов'язково зателефонуйте, щоб ми підготували деталь.</p>
+              <p>Самовивіз доступний у <strong>м. Горохів (Волинська обл.)</strong>. Перед візитом обов'язково зателефонуйте, щоб ми підготували деталь.</p>
             </div>
           </div>
         </section>

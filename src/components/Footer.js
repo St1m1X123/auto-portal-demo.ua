@@ -53,7 +53,7 @@ export default function Footer() {
 
           <div className="space-y-1">
             <p className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Графік роботи</p>
-            <p className="text-sm font-bold text-white">Пн-Сб 09:00 — 18:00</p>
+            <p className="text-sm font-bold text-white">Пн-Сб 09:00 — 20:00</p>
           </div>
 
           <div className="flex gap-4 pt-2">

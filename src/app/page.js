@@ -12,6 +12,8 @@ function AutoPortalContent() {
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [showBanner, setShowBanner] = useState(true);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const searchParams = useSearchParams();
   const router = useRouter(); // Ініціалізуємо роутер
@@ -148,10 +150,59 @@ function AutoPortalContent() {
               }, 150);
             }} />
 
+            {/* >>> БАНЕР (ВИПРАВЛЕНИЙ: Великий шрифт, зручний хрестик) <<< */}
+            {!selectedBrand && showBanner && (
+              <div className="max-w-6xl mx-auto px-4 mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="bg-white border border-blue-100 rounded-xl p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm shadow-blue-50 relative">
+
+                  {/* Хрестик (Максимально в кутку) */}
+                  <button
+                    onClick={() => setShowBanner(false)}
+                    // Було: top-3 right-3 p-2. Стало: top-1 right-1 p-1.
+                    className="absolute top-1 right-1 text-slate-400 hover:text-red-500 hover:bg-slate-50 rounded-full p-1 transition-all"
+                    title="Закрити"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+
+                  <div className="flex items-center gap-4 text-center md:text-left pr-8">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-lg text-white shrink-0 shadow-sm">
+                      📦
+                    </div>
+                    <div>
+                      {/* Заголовок (Збільшив шрифт до text-sm) */}
+                      <h3 className="font-bold text-slate-900 text-sm uppercase tracking-tight mb-1">
+                        Не знайшли запчастину?
+                      </h3>
+                      {/* Опис (Збільшив шрифт до text-xs) */}
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-lg">
+                        Ми можемо знайти та привезти деталь для <span className="text-blue-600 font-bold">будь-якої моделі Opel</span>.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Кнопка */}
+                  {/* КНОПКА (тепер відкриває вікно) */}
+                  <button
+                    onClick={() => setShowOrderModal(true)}
+                    className="whitespace-nowrap bg-blue-600 text-white px-6 py-3 rounded-lg font-bold uppercase text-[11px] tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-100 active:scale-95 w-full md:w-auto text-center"
+                  >
+                    Замовити
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="max-w-6xl mx-auto px-4 py-4">
               <nav className="text-xs sm:text-sm font-bold flex flex-wrap items-center gap-1 sm:gap-2 text-slate-400 uppercase tracking-widest">
-                <button onClick={handleResetToBrands} className={`hover:text-blue-600 transition ${!selectedBrand ? 'text-blue-600' : ''}`}>
-                  ВСІ МАРКИ
+                {/* Хрестик (Максимально в кутку) */}
+                <button
+                  onClick={() => setShowBanner(false)}
+                  // Було: top-3 right-3 p-2. Стало: top-1 right-1 p-1.
+                  className="absolute top-1 right-1 text-slate-400 hover:text-red-500 hover:bg-slate-50 rounded-full p-1 transition-all"
+                  title="Закрити"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
                 {selectedBrand && (
                   <><span>/</span><button onClick={handleResetToModels} className={`hover:text-blue-600 transition ${!selectedModel ? 'text-blue-600' : ''}`}>{selectedBrand}</button></>
@@ -238,6 +289,37 @@ function AutoPortalContent() {
           </section>
         )}
       </main>
+      {/* --- МОДАЛЬНЕ ВІКНО "ЗАМОВИТИ ПІДБІР" --- */}
+      {showOrderModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 font-montserrat">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowOrderModal(false)} />
+          <div className="relative bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+            {/* Заголовок */}
+            <div className="bg-slate-50 px-8 py-6 border-b border-slate-100">
+              <h3 className="text-xl font-black text-slate-800 uppercase leading-tight mb-1">Запит на підбір</h3>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Ми знайдемо потрібну деталь для вашого Opel</p>
+            </div>
+
+            {/* Поля форми */}
+            <div className="p-8 overflow-y-auto space-y-6">
+              <div className="space-y-4">
+                <input type="text" placeholder="Ваше ім'я" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm" />
+                <input type="tel" placeholder="Номер телефону" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm" />
+                <textarea rows="3" placeholder="Яка деталь вам потрібна? (Модель, рік, назва...)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm resize-none"></textarea>
+              </div>
+              <button className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-blue-100 active:scale-95 transition-all hover:bg-blue-700">
+                Надіслати запит
+              </button>
+            </div>
+
+            {/* Кнопка закриття */}
+            <button onClick={() => setShowOrderModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 rounded-full p-2 transition-all shadow-sm border border-slate-100">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
