@@ -1,14 +1,19 @@
 "use client";
 
-import React, { useState, Suspense, useEffect } from 'react'; // Додали useEffect
+import React, { useState, Suspense, useEffect } from 'react';
 import BrandGrid from '@/components/BrandGrid';
 import ModelGrid from '@/components/ModelGrid';
 import CategoryGrid from '@/components/CategoryGrid';
 import ProductGrid from '@/components/ProductGrid';
 import QuickSearch from '@/components/QuickSearch';
-import { useSearchParams, useRouter } from 'next/navigation'; // Додали useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
+import { supabase } from '@/utils/supabase'; // Наш зв'язок з базою
 
 function AutoPortalContent() {
+  // --- НОВІ СТАНИ ДЛЯ БАЗИ ДАНИХ ---
+  const [allProducts, setAllProducts] = useState([]); // Тут будуть лежати всі товари з бази
+  const [isLoading, setIsLoading] = useState(true);   // Стан завантаження
+
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -16,40 +21,62 @@ function AutoPortalContent() {
   const [showOrderModal, setShowOrderModal] = useState(false);
 
   const searchParams = useSearchParams();
-  const router = useRouter(); // Ініціалізуємо роутер
+  const router = useRouter();
   const searchQuery = searchParams.get('search');
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // 1. СИНХРОНІЗАЦІЯ З URL (щоб працювала кнопка Назад)
+  // --- 1. ЗАВАНТАЖЕННЯ ТОВАРІВ З SUPABASE ---
   useEffect(() => {
-    const brand = searchParams.get('brand');
-    const model = searchParams.get('model');
-    const cat = searchParams.get('cat');
+    async function fetchProducts() {
+      try {
+        setIsLoading(true);
+        // Тягнемо всі товари з таблиці products
+        const { data, error } = await supabase
+          .from('products')
+          .select('*');
 
-    if (brand) setSelectedBrand(brand);
-    if (model) setSelectedModel(model);
-    if (cat) setSelectedCategory(cat);
-  }, [searchParams]);
+        if (error) throw error;
+        setAllProducts(data || []);
+      } catch (error) {
+        console.error('Помилка завантаження товарів:', error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
 
-  // Допоміжна функція для оновлення URL
+    fetchProducts();
+  }, []);
+
+  // 2. СИНХРОНІЗАЦІЯ З URL
+  useEffect(() => {
+    // Включаем режим поиска только если есть запрос, загружены товары 
+    // и мы еще НЕ находимся в режиме "Всі запчастини"
+    if (searchQuery && allProducts.length > 0 && selectedCategory !== 'Всі запчастини' && !isTransitioning) {
+      setSelectedBrand('OPEL');
+      setSelectedModel(null);
+      setSelectedCategory('Всі запчастини');
+    }
+
+    // Если поиск очистили вручную — сбрасываем категорию, чтобы можно было выбирать модели
+    if (!searchQuery && selectedCategory === 'Всі запчастини') {
+      setSelectedCategory(null);
+    }
+  }, [searchQuery, allProducts, selectedCategory, isTransitioning]);
+
+  // --- ФУНКЦІЇ ПЕРЕМИКАННЯ (залишаються як були) ---
   const updateURL = (brand, model, cat) => {
     const params = new URLSearchParams();
     if (brand) params.set('brand', brand);
     if (model) params.set('model', model);
     if (cat && cat !== 'Всі запчастини') params.set('cat', cat);
-
-    // Оновлюємо URL без перезавантаження сторінки
     router.push(`?${params.toString()}`, { scroll: false });
   };
 
-  // --- ФУНКЦІЇ ПЕРЕМИКАННЯ (тепер з оновленням URL) ---
   const handleSelectBrand = (name) => {
     setIsTransitioning(true);
     setTimeout(() => {
-      setSelectedBrand(name);
-      setSelectedModel(null);
-      setSelectedCategory(null);
-      updateURL(name, null, null); // Оновлюємо посилання
+      setSelectedBrand(name); setSelectedModel(null); setSelectedCategory(null);
+      updateURL(name, null, null);
       setIsTransitioning(false);
     }, 150);
   };
@@ -57,9 +84,8 @@ function AutoPortalContent() {
   const handleSelectModel = (name) => {
     setIsTransitioning(true);
     setTimeout(() => {
-      setSelectedModel(name);
-      setSelectedCategory(null);
-      updateURL(selectedBrand, name, null); // Оновлюємо посилання
+      setSelectedModel(name); setSelectedCategory(null);
+      updateURL(selectedBrand, name, null);
       setIsTransitioning(false);
     }, 150);
   };
@@ -68,16 +94,22 @@ function AutoPortalContent() {
     setIsTransitioning(true);
     setTimeout(() => {
       setSelectedCategory(name);
-      updateURL(selectedBrand, selectedModel, name); // Оновлюємо посилання
+      updateURL(selectedBrand, selectedModel, name);
       setIsTransitioning(false);
     }, 150);
   };
 
   const handleResetToBrands = () => {
     setIsTransitioning(true);
+    router.push('/'); // Стираем поиск сразу
+
     setTimeout(() => {
-      setSelectedBrand(null); setSelectedModel(null); setSelectedCategory(null);
-      router.push('/', { scroll: false }); // Скидаємо URL
+      // Сбрасываем все состояния
+      setSelectedBrand(null);
+      setSelectedModel(null);
+      setSelectedCategory(null);
+
+      // Второй router.push здесь не нужен, мы уже перешли выше
       setIsTransitioning(false);
     }, 150);
   };
@@ -99,6 +131,56 @@ function AutoPortalContent() {
       setIsTransitioning(false);
     }, 150);
   };
+
+  // --- ЛОГІКА ФІЛЬТРАЦІЇ (V3: FINAL BOSS EDITION) ---
+  const filteredProducts = allProducts.filter(product => {
+    // Подготовка данных (всё в нижний регистр, чтобы не париться)
+    const pName = (product.name || "").toLowerCase();
+    const pModels = String(product.models || "").toLowerCase().trim();
+    const pOe = (product.oe || "").toLowerCase().trim();
+    // Читаем новую колонку BRAND. Якщо пусто — вважаємо це Opel
+    const pBrand = String(product.brand || "opel").toLowerCase().trim();
+
+    const brandTarget = (selectedBrand || "").toLowerCase();
+    const modelTarget = (selectedModel || "").toLowerCase();
+    const searchTarget = (searchQuery || "").toLowerCase();
+
+    // 0. ПЕРЕВІРКА НА УНІВЕРСАЛЬНІСТЬ (Масло, килимки, хімія)
+    // Товар універсальний, якщо в моделях або В БРЕНДІ є слова-маркери
+    const isUniversal = pModels.includes("всі") || pModels.includes("*") || pModels.includes("777") ||
+      pBrand === "всі" || pBrand === "universal";
+
+    // 1. БРЕНД 
+    // Товар проходить, якщо:
+    // а) Бренд не вибрано
+    // б) АБО бренд товару співпадає з обраним (Opel === Opel)
+    // в) АБО товар універсальний (isUniversal)
+    const matchesBrand = !selectedBrand ||
+      pBrand === brandTarget ||
+      isUniversal;
+
+    // 2. МОДЕЛЬ
+    // Товар проходить, якщо:
+    // а) Модель не вибрана
+    // б) АБО модель є в списку models
+    // в) АБО товар універсальний
+    // г) АБО модель згадана в назві
+    const matchesModel = !selectedModel ||
+      pModels.includes(modelTarget) ||
+      isUniversal ||
+      pName.includes(modelTarget);
+
+    // 3. КАТЕГОРІЯ
+    const matchesCategory = !selectedCategory || selectedCategory === 'Всі запчастини' || product.category === selectedCategory;
+
+    // 4. ПОШУК
+    const matchesSearch = !searchQuery ||
+      pName.includes(searchTarget) ||
+      pOe.includes(searchTarget) ||
+      pModels.includes(searchTarget); // Пошук теж бачить моделі
+
+    return matchesBrand && matchesModel && matchesCategory && matchesSearch;
+  });
 
   // Решта коду (return) залишається без змін...
   return (
@@ -130,6 +212,7 @@ function AutoPortalContent() {
 
               {/* Оживляємо стандартну кнопку Назад всередині ProductGrid */}
               <ProductGrid
+                products={filteredProducts}
                 categoryName="Всі запчастини"
                 globalSearchQuery={searchQuery}
                 onBack={handleResetToBrands} // <--- Оце саме те, що ти просив!
@@ -230,11 +313,11 @@ function AutoPortalContent() {
                         Всі запчастини на {selectedModel}
                       </h2>
                     </div>
-                    <ProductGrid categoryName="Всі запчастини" hideHeader={true} />
+                    <ProductGrid products={filteredProducts} categoryName="Всі запчастини" hideHeader={true} />
                   </div>
                 </>
               ) : (
-                <ProductGrid categoryName={selectedCategory} onBack={() => setSelectedCategory('Всі запчастини')} />
+                <ProductGrid products={filteredProducts} categoryName={selectedCategory} onBack={() => setSelectedCategory('Всі запчастини')} />
               )}
             </div>
           </>

@@ -1,37 +1,44 @@
-import { dummyProducts } from '../../../utils/inventoryData';
+import { supabase } from '@/utils/supabase';
 import ProductClient from './ProductClient';
 
-// --- ГЕНЕРАЦІЯ МЕТА-ТЕГІВ (SEO) ---
-export async function generateMetadata({ params }) {
-  // 1. Шукаємо товар по ID
-  const product = dummyProducts.find((p) => p.id.toString() === params.id);
+export async function generateStaticParams() {
+  const { data: products } = await supabase.from('products').select('id');
+  return (products || []).map((product) => ({
+    id: product.id.toString(),
+  }));
+}
 
-  // ВАЖЛИВО: Вказуємо реальну адресу твого сайту на Vercel
-  // Без цього Facebook часто ігнорує картинки
+// --- ГЕНЕРАЦІЯ МЕТА-ТЕГІВ (SEO) ---
+export async function generateMetadata(props) {
+  const params = await props.params; 
+  const id = params.id;
+
+  const { data: product } = await supabase
+  .from('products')
+  .select('*')
+  .eq('id', id)
+  .single();
+  
   const baseUrl = 'https://auto-portal-demo-ua.vercel.app';
 
-  // Якщо товару немає (або стара версія файлу на сервері), віддаємо заглушку
   if (!product) {
     return {
       metadataBase: new URL(baseUrl),
       title: 'Товар не знайдено | Опель Шрот Горохів',
       description: 'Професійна розборка та продаж запчастин',
-      openGraph: {
-        images: '/logo.png', // Можна додати логотип сайту, якщо є
-      }
     };
   }
 
-  // 2. Формуємо красивий заголовок
   const title = `${product.name} (${product.oe}) | Купити в м. Горохів`;
   const description = `Оригінальна Б/В запчастина: ${product.name}. Ціна: ${product.price}. Оригінальний номер: ${product.oe}. Стан: ${product.condition}. Відправка по Україні. ☎️ 068 137 40 18`;
 
-  // 3. Повертаємо правильні теги
+  // ВИПРАВЛЕННЯ: Беремо фотку з масиву images або стару image
+  const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : product.image;
+
   return {
-    metadataBase: new URL(baseUrl), // <--- ОСЬ ЦЕ ВИПРАВЛЯЄ ПОМИЛКУ FACEBOOK
+    metadataBase: new URL(baseUrl),
     title: title,
     description: description,
-    
     openGraph: {
       title: title,
       description: description,
@@ -39,7 +46,7 @@ export async function generateMetadata({ params }) {
       siteName: 'Автопортал - Опель Шрот',
       images: [
         {
-          url: product.image, // Просто URL, без ширини/висоти (так надійніше для Facebook)
+          url: imageUrl || '', // Використовуємо правильне посилання
         },
       ],
       locale: 'uk_UA',
@@ -48,7 +55,6 @@ export async function generateMetadata({ params }) {
   };
 }
 
-// --- ОСНОВНИЙ КОМПОНЕНТ ---
 export default function Page() {
   return <ProductClient />;
 }

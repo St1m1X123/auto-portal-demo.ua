@@ -1,30 +1,83 @@
 import React, { useState } from 'react';
 import Link from 'next/link'; // <--- 1. Додали імпорт для посилань
-import { subcategoriesData, dummyProducts } from '../utils/inventoryData';
 import { useCart } from '@/context/CartContext';
 
-export default function ProductGrid({ categoryName, globalSearchQuery, onBack, hideHeader = false }) {
+export default function ProductGrid({ categoryName, globalSearchQuery, onBack, hideHeader = false, products = [] }) {
     const { addToCart } = useCart();
     const [activeChip, setActiveChip] = useState('Всі');
     const [isExpanded, setIsExpanded] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
 
-    // 1. СПОЧАТКУ РОЗРАХУНОК
-    const isAllPartsMode = categoryName === 'Всі запчастини';
-    const allChips = isAllPartsMode ? [] : (subcategoriesData[categoryName] || subcategoriesData['default']);
-    const MAX_MOBILE_VISIBLE = 4;
-    const hiddenCount = allChips.length - MAX_MOBILE_VISIBLE;
+    // 1. СПОЧАТКУ ОГОЛОШУЄМО ДЖЕРЕЛО ДАНИХ (Це важливо!)
+    const productsSource = products;
 
-    const filteredProducts = dummyProducts.filter(p => {
-        const categoryMatch = categoryName === 'Всі запчастини' || p.cat === categoryName;
-        const subcatMatch = activeChip === 'Всі' || p.subcat === activeChip;
+    const isAllPartsMode = categoryName === 'Всі запчастини';
+
+    // 2. ТЕПЕР РАХУЄМО ЧІПСИ (Тепер productsSource вже існує і код не зламається)
+    const dynamicSubcats = isAllPartsMode
+        ? []
+        : [...new Set(
+            productsSource
+                .filter(p => {
+                    const pCat = p.category || p.cat || "";
+                    // Приводим всё к нижнему регистру и убираем лишние пробелы
+                    const pModels = String(p.models || "").toLowerCase().trim();
+                    const target = categoryName.toLowerCase().trim();
+
+                    return pCat === categoryName ||
+                        pModels.includes(target) ||
+                        pModels.includes("*");
+                })
+                .map(p => p.subcat)
+        )].filter(Boolean).sort();
+
+    // 3. ФОРМУЄМО СПИСОК КНОПОК
+    const allChips = isAllPartsMode ? [] : ['Всі', ...dynamicSubcats];
+    const MAX_MOBILE_VISIBLE = 4;
+    const hiddenCount = Math.max(0, allChips.length - MAX_MOBILE_VISIBLE);
+
+    // 4. ФІНАЛЬНИЙ ФІЛЬТР (Виправлено завдяки твоїй знахідці)
+    const filteredProducts = productsSource.filter(p => {
+        // Підготовка даних
+        const pModels = String(p.models || p.model || "").toLowerCase().trim();
+        const pName = p.name.toLowerCase().trim();
+        const pOe = (p.oe || "").toLowerCase().trim();
+        const searchLower = (globalSearchQuery || "").toLowerCase().trim();
+        const categoryTarget = categoryName.toLowerCase().trim();
+
+        // 1. Універсальні товари (Масло, хімія)
+        // Шукаємо: "всі", "777", "*" або "universal"
+        const isUniversal = pModels.includes("всі") || pModels.includes("*") || pModels.includes("777");
+
+        // 2. Логіка Категорії / Моделі
+        // Чи підходить цей товар під обрану плитку (наприклад "Astra G")?
+        const isModelMatch = pModels.includes(categoryTarget);
+
+        const categoryMatch =
+            categoryName === 'Всі запчастини' ||
+            (p.category || "").toLowerCase() === categoryTarget ||
+            isModelMatch ||  // <--- Головна перевірка моделі
+            isUniversal;     // <--- Головна перевірка масла
+
+        // 3. Логіка Пошуку (ОСЬ ТУТ БУЛА ПРОБЛЕМА!)
+        // Якщо пошуку немає — все ок.
+        // Якщо пошук Є, то товар підходить, ЯКЩО:
+        // АБО слово є в назві
+        // АБО слово є в номері запчастини (OE)
+        // АБО (УВАГА!) слово знайдено в списку МОДЕЛЕЙ (pModels) <--- МИ ДОДАЛИ ЦЕ!
         const matchesSearch = !globalSearchQuery ||
-            p.name.toLowerCase().includes(globalSearchQuery.toLowerCase()) ||
-            (p.oe && p.oe.toLowerCase().includes(globalSearchQuery.toLowerCase()));
+            pName.includes(searchLower) ||
+            pOe.includes(searchLower) ||
+            pModels.includes(searchLower) || // <--- ОСЬ ЦЕ ВИРІШУЄ ПРОБЛЕМУ!
+            (isUniversal && isModelMatch);   // Масло покажеться, якщо ми в правильній моделі
+
+        // 4. Логіка Чіпсів
+        const subcatMatch = (!!globalSearchQuery) || activeChip === 'Всі' || p.subcat === activeChip;
 
         return categoryMatch && subcatMatch && matchesSearch;
     });
+
     const handleBuyClick = (product) => {
         setSelectedProduct(product);
         setShowModal(true);
@@ -95,7 +148,11 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                                 {/* 2. ФОТО ТЕПЕР ПОСИЛАННЯ */}
                                 <Link href={`/product/${product.id}`} className="block">
                                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden cursor-pointer">
-                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        <img
+                                            src={(product.images && product.images[0]) || product.image}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
                                         <div className="absolute top-2 left-2 flex gap-1">
                                             <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg uppercase">
                                                 {product.condition}
@@ -180,7 +237,11 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                         <div className="hidden md:flex md:w-[35%] bg-slate-50 p-10 flex-col justify-center border-r border-slate-100">
                             <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">Ваше замовлення</p>
                             <div className="aspect-square w-full rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-100 mb-6">
-                                <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                                <img
+                                    src={(selectedProduct.images && selectedProduct.images[0]) || selectedProduct.image}
+                                    alt={selectedProduct.name}
+                                    className="w-full h-full object-cover"
+                                />
                             </div>
                             <h3 className="text-xl font-black text-slate-800 uppercase leading-tight mb-2">{selectedProduct.name}</h3>
                             <div className="flex items-center gap-2">
@@ -196,7 +257,11 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                             {/* Мобільне прев'ю (ховається на десктопі) */}
                             <div className="md:hidden flex items-center gap-3 mb-5 bg-slate-50 p-3 rounded-2xl border border-slate-100">
                                 <div className="w-12 h-12 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-slate-100">
-                                    <img src={selectedProduct.image} alt="" className="w-full h-full object-cover" />
+                                    <img
+                                        src={(selectedProduct.images && selectedProduct.images[0]) || selectedProduct.image}
+                                        alt=""
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
                                 <div className="overflow-hidden">
                                     <h4 className="text-[11px] font-black text-slate-800 uppercase truncate">{selectedProduct.name}</h4>

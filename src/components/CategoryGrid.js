@@ -1,5 +1,7 @@
+"use client";
+
 import React from 'react';
-import { categories } from '../utils/inventoryData';
+import { categories } from '../utils/inventoryData'; // Повертаємо імпорт із файлу
 
 export default function CategoryGrid({ onSelectCategory, onBack }) {
   return (
@@ -24,8 +26,7 @@ export default function CategoryGrid({ onSelectCategory, onBack }) {
           </h2>
         </div>
 
-        {/* СІТКА (Оновлена: 6 в ряд) */}
-        {/* grid-cols-2 (моб) -> grid-cols-4 (планшет) -> grid-cols-6 (ПК) */}
+        {/* СІТКА: Тепер беремо дані безпосередньо з categories (без useState) */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {categories.map((cat) => (
             <div
@@ -36,7 +37,6 @@ export default function CategoryGrid({ onSelectCategory, onBack }) {
               {/* Ефект підсвітки */}
               <div className="absolute inset-0 bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               
-              {/* Назва категорії */}
               <h3 className="relative z-10 font-bold text-slate-700 group-hover:text-blue-700 text-xs md:text-xs lg:text-sm uppercase tracking-tight leading-snug px-1">
                 {cat}
               </h3>
