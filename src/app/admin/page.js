@@ -11,6 +11,10 @@ import {
 } from '@/utils/inventoryData';
 
 export default function AdminPage() {
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchRef = useRef(null);
+    const router = useRouter();
     const [user, setUser] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -28,6 +32,62 @@ export default function AdminPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [quickUploading, setQuickUploading] = useState(false);
+
+    // --- МАСОВІ ДІЇ (State) ---
+    const [selectedIds, setSelectedIds] = useState([]);
+
+    // Логіка: Вибрати один
+    const toggleSelect = (id) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    // Логіка: Вибрати всі (ті, що зараз відфільтровані)
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0) {
+            setSelectedIds([]); // Зняти виділення
+        } else {
+            setSelectedIds(filteredAndSortedProducts.map(p => p.id)); // Вибрати всі видимі
+        }
+    };
+
+    // Дія: Масове переміщення в чернетки
+    const handleBulkDraft = async () => {
+        if (!confirm(`Перенести ${selectedIds.length} товарів у чернетки?`)) return;
+
+        setLoading(true);
+        const { error } = await supabase
+            .from('products')
+            .update({ status: 'draft' })
+            .in('id', selectedIds);
+
+        if (error) alert('Помилка: ' + error.message);
+        else {
+            setSelectedIds([]); // Очистити вибір
+            fetchAdminProducts(); // Оновити таблицю
+        }
+        setLoading(false);
+    };
+
+    // Дія: Масове видалення
+    const handleBulkDelete = async () => {
+        const count = selectedIds.length;
+        if (!confirm(`⚠️ УВАГА!\nВи збираєтесь НАЗАВЖДИ видалити ${count} товарів.\n\nЦе неможливо скасувати. Продовжити?`)) return;
+
+        setLoading(true);
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .in('id', selectedIds);
+
+        if (error) alert('Помилка: ' + error.message);
+        else {
+            setSelectedIds([]);
+            fetchAdminProducts();
+        }
+        setLoading(false);
+    };
 
     const [editingId, setEditingId] = useState(null);
     const [availableSubcats, setAvailableSubcats] = useState([]);
@@ -60,6 +120,34 @@ export default function AdminPage() {
         }
         return () => { document.body.style.overflow = 'unset'; };
     }, [isModalOpen, viewingProduct]);
+
+    // Логіка підказок для пошуку (як у клієнтському Header)
+    useEffect(() => {
+        if (searchQuery.length > 1) {
+            const filtered = products
+                .filter(p =>
+                    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    p.oe?.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .slice(0, 8); // Показуємо максимум 8 підказок
+            setSuggestions(filtered);
+            setShowSuggestions(true);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    }, [searchQuery, products]);
+
+    // Закриття списку при кліку поза пошуком
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchRef.current && !searchRef.current.contains(e.target)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     useEffect(() => {
         const checkUser = async () => {
@@ -531,27 +619,107 @@ export default function AdminPage() {
                 }
             `}</style>
 
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-20">
-                {/* Логотип (Зліва) */}
-                <h1 className="font-black text-xl uppercase tracking-tighter text-slate-900">Admin <span className="text-blue-600">Portal</span></h1>
+            {/* АДАПТИВНАЯ АДМИН-ШАПКА (Исправлено для мобилок) */}
+            <header className={`admin-header sticky top-0 z-[60] transition-all duration-300 shadow-md ${
+                selectedIds.length > 0 ? 'bg-slate-900 text-white' : 'bg-white text-slate-900 border-b border-slate-200'
+            }`}>
+                <div className="px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:h-20">
+                    
+                    {selectedIds.length === 0 ? (
+                        <>
+                            {/* ВЕРХНИЙ РЯД: Лого + Кнопки (База/Выход) */}
+                            <div className="flex items-center justify-between w-full md:w-auto gap-4">
+                                <div 
+                                    onClick={() => router.push('/')} 
+                                    className="font-black text-lg uppercase tracking-tighter cursor-pointer shrink-0"
+                                >
+                                    Admin <span className="text-blue-600">Portal</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={() => setIsImpExpOpen(true)}
+                                        className="p-2 text-blue-500 bg-blue-50 rounded-xl md:bg-transparent md:border md:border-blue-500/20 md:px-4 md:py-2 md:text-sm font-bold flex items-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V7M4 7c0-1.1.9-2 2-2h12c1.1 0 2 .9 2 2M4 7l8 4 8-4M12 11l8-4" /></svg>
+                                        <span className="hidden md:inline">База</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => supabase.auth.signOut().then(() => window.location.reload())} 
+                                        className="p-2 text-red-500 bg-red-50 rounded-xl md:bg-transparent md:border md:border-red-100 md:px-4 md:py-2 text-[10px] font-black uppercase"
+                                    >
+                                        Вийти
+                                    </button>
+                                </div>
+                            </div>
 
-                {/* Група кнопок (Справа разом) */}
-                <div className="flex items-center gap-3">
+                            {/* НИЖНИЙ РЯД (на мобилках) / ЦЕНТР (на десктопе): ПОИСК */}
+                            <div className="relative flex-1 max-w-2xl w-full" ref={searchRef}>
+                                <div className="relative group">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Пошук запчастин..." 
+                                        className="w-full pl-11 pr-4 py-2.5 md:py-3 bg-slate-100 border-none rounded-2xl font-bold text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        onFocus={() => searchQuery.length > 1 && setShowSuggestions(true)}
+                                    />
+                                </div>
 
-                    {/* Кнопка БАЗИ */}
-                    <button
-                        onClick={() => setIsImpExpOpen(true)}
-                        className="flex items-center gap-2 text-blue-400 border border-blue-400/30 hover:bg-blue-600 hover:text-white hover:border-blue-600 px-4 py-2 rounded-lg transition-all active:scale-95"
-                        title="Імпорт та Експорт"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                        <span className="hidden md:inline font-bold text-sm">База</span>
-                    </button>
-
-                    {/* Кнопка Вийти */}
-                    <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())} className="text-[10px] font-black uppercase text-red-500 hover:bg-red-50 px-4 py-2 rounded-xl border border-red-100 transition-all">
-                        Вийти
-                    </button>
+                                {/* ПОДСКАЗКИ (Autocomplete) */}
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[100] max-h-[60vh] overflow-y-auto translate-y-0">
+                                        {suggestions.map((s) => (
+                                            <div 
+                                                key={s.id}
+                                                onClick={() => {
+                                                    setSearchQuery(s.oe || s.name);
+                                                    setShowSuggestions(false);
+                                                }}
+                                                className="flex items-center gap-3 p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-none"
+                                            >
+                                                <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                                                    {s.images?.[0] && <img src={s.images[0]} className="w-full h-full object-cover" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-slate-800 truncate">{s.name}</p>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-black">OE: {s.oe || '---'}</p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <p className="text-xs font-black text-blue-600">{s.price}₴</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        // --- РЕЖИМ МАССОВЫХ ДЕЙСТВИЙ (всегда в один ряд) ---
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setSelectedIds([])} className="p-2 hover:bg-white/10 rounded-full">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                                <span className="font-black text-sm md:text-lg whitespace-nowrap">
+                                    Вибрано: <span className="text-blue-400">{selectedIds.length}</span>
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={handleBulkDraft} className="bg-blue-600 p-2 md:px-4 md:py-2 rounded-xl font-bold text-xs flex items-center gap-2">
+                                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    <span className="hidden sm:inline">В архів</span>
+                                </button>
+                                <button onClick={handleBulkDelete} className="bg-red-600 p-2 md:px-4 md:py-2 rounded-xl font-bold text-xs flex items-center gap-2">
+                                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    <span className="hidden sm:inline">Видалити</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -723,6 +891,15 @@ export default function AdminPage() {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
                                 <tr>
+                                    {/* ЧЕКБОКС ВСІХ (Заголовок) */}
+                                    <th className="px-4 py-4 w-14 text-center">
+                                        <input
+                                            type="checkbox"
+                                            className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            checked={filteredAndSortedProducts.length > 0 && selectedIds.length === filteredAndSortedProducts.length}
+                                            onChange={toggleSelectAll}
+                                        />
+                                    </th>
                                     <th onClick={() => requestSort('id')} className="px-4 py-4 md:px-6 md:py-5 cursor-pointer hover:text-blue-600 transition-colors min-w-[70px]">
                                         ID {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                     </th>
@@ -740,6 +917,15 @@ export default function AdminPage() {
                             <tbody className="divide-y divide-slate-100">
                                 {filteredAndSortedProducts.slice(0, visibleCount).map((p) => (
                                     <tr key={p.id} onClick={() => { setViewingProduct(p); setCurrentImageIndex(0); }} className="hover:bg-blue-50/50 transition-colors cursor-pointer group">
+                                        {/* ЧЕКБОКС */}
+                                        <td className="px-4 py-3 md:px-6 md:py-4 w-10" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                checked={selectedIds.includes(p.id)}
+                                                onChange={() => toggleSelect(p.id)}
+                                            />
+                                        </td>
                                         {/* ID */}
                                         <td className="px-4 py-3 md:px-6 md:py-4">
                                             <span className="font-mono font-bold text-slate-400 text-[10px] md:text-xs group-hover:text-blue-600">#{p.id}</span>
@@ -1177,6 +1363,14 @@ export default function AdminPage() {
                     </div>
                 </div>
             )}
+
+            {/* Ховаємо клієнтський Header та кнопку зв'язку в адмінці */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                header:not(.admin-header) { display: none !important; }
+                .fixed.bottom-5.right-5 { display: none !important; }
+            ` }} />
+
 
         </div>
     );
