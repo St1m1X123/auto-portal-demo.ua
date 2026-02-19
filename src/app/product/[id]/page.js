@@ -1,6 +1,8 @@
 import { supabase } from '@/utils/supabase';
 import ProductClient from './ProductClient';
+import { notFound } from 'next/navigation'; // Для 404 ошибки
 
+// Генерация статических путей (оставляем как было)
 export async function generateStaticParams() {
   const { data: products } = await supabase.from('products').select('id');
   return (products || []).map((product) => ({
@@ -8,53 +10,56 @@ export async function generateStaticParams() {
   }));
 }
 
-// --- ГЕНЕРАЦІЯ МЕТА-ТЕГІВ (SEO) ---
+// Генерация мета-тегов для SEO (оставляем как было, это гуд)
 export async function generateMetadata(props) {
   const params = await props.params; 
   const id = params.id;
 
   const { data: product } = await supabase
-  .from('products')
-  .select('*')
-  .eq('id', id)
-  .single();
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .single();
   
-  const baseUrl = 'https://auto-portal-demo-ua.vercel.app';
+  const baseUrl = 'https://auto-portal-demo-ua.vercel.app'; // Твой домен
 
   if (!product) {
     return {
-      metadataBase: new URL(baseUrl),
-      title: 'Товар не знайдено | Опель Шрот Горохів',
-      description: 'Професійна розборка та продаж запчастин',
+      title: 'Товар не знайдено',
+      description: 'Запчастини Опель',
     };
   }
 
-  const title = `${product.name} (${product.oe}) | Купити в м. Горохів`;
-  const description = `Оригінальна Б/В запчастина: ${product.name}. Ціна: ${product.price}. Оригінальний номер: ${product.oe}. Стан: ${product.condition}. Відправка по Україні. ☎️ 068 137 40 18`;
-
-  // ВИПРАВЛЕННЯ: Беремо фотку з масиву images або стару image
+  // Умный выбор картинки
   const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : product.image;
 
   return {
-    metadataBase: new URL(baseUrl),
-    title: title,
-    description: description,
+    title: `${product.name} (${product.oe}) | Купити в м. Горохів`,
+    description: `Оригінальна запчастина ${product.name}. ID: ${product.id}. Ціна: ${product.price} грн.`,
     openGraph: {
-      title: title,
-      description: description,
-      url: `/product/${product.id}`,
-      siteName: 'Автопортал - Опель Шрот',
-      images: [
-        {
-          url: imageUrl || '', // Використовуємо правильне посилання
-        },
-      ],
-      locale: 'uk_UA',
-      type: 'website',
+      title: product.name,
+      description: `Ціна: ${product.price} грн`,
+      images: [imageUrl || `${baseUrl}/og-image.jpg`],
     },
   };
 }
 
-export default function Page() {
-  return <ProductClient />;
+// === ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ===
+export default async function ProductPage(props) {
+  const params = await props.params;
+  
+  // 1. Сервер сам ищет товар
+  const { data: product } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', params.id)
+    .single();
+
+  // 2. Если товара нет — показываем 404
+  if (!product) {
+    notFound();
+  }
+
+  // 3. Передаем ГОТОВЫЙ товар в компонент. Никаких ожиданий!
+  return <ProductClient initialProduct={product} />;
 }

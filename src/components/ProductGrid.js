@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import Link from 'next/link'; // <--- 1. Додали імпорт для посилань
 import { useCart } from '@/context/CartContext';
 
-export default function ProductGrid({ categoryName, globalSearchQuery, onBack, hideHeader = false, products = [] }) {
-    const { addToCart } = useCart();
+export default function ProductGrid({
+    categoryName,
+    globalSearchQuery,
+    onBack,
+    hideHeader = false,
+    products = []
+}) {
+    const { addToCart, cart } = useCart();
     const [activeChip, setActiveChip] = useState('Всі');
     const [isExpanded, setIsExpanded] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const isSelectedInCart = selectedProduct && cart.some((item) => item.id === selectedProduct.id);
 
     // 1. СПОЧАТКУ ОГОЛОШУЄМО ДЖЕРЕЛО ДАНИХ (Це важливо!)
     const productsSource = products;
@@ -92,7 +99,9 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                 {!hideHeader && (
                     <div className="mb-6 flex items-center gap-4">
                         <button onClick={onBack} className="flex items-center gap-1.5 text-slate-600 bg-slate-100 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg font-black text-sm uppercase tracking-wider transition-all active:scale-95 shadow-sm">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+                            </svg>
                             Назад
                         </button>
                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -149,8 +158,15 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                                 <Link href={`/product/${product.id}`} className="block">
                                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden cursor-pointer">
                                         <img
-                                            src={(product.images && product.images[0]) || product.image}
-                                            alt={product.name}
+                                            loading="lazy"
+                                            src={
+                                                (product.images && product.images[0] && product.images[0].startsWith('http'))
+                                                    ? product.images[0]
+                                                    : (product.image && product.image.startsWith('http'))
+                                                        ? product.image
+                                                        : 'https://placehold.co/400x300?text=No+Image'
+                                            }
+                                            alt={product.name || 'Товар'}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />
                                         <div className="absolute top-2 left-2 flex gap-1">
@@ -238,8 +254,9 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                             <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-4">Ваше замовлення</p>
                             <div className="aspect-square w-full rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-100 mb-6">
                                 <img
-                                    src={(selectedProduct.images && selectedProduct.images[0]) || selectedProduct.image}
-                                    alt={selectedProduct.name}
+                                    loading="lazy"
+                                    src={(selectedProduct.images && selectedProduct.images[0]) ? selectedProduct.images[0] : (selectedProduct.image || 'https://placehold.co/400x300?text=No+Image')}
+                                    alt={selectedProduct.name || 'Запчастина'}
                                     className="w-full h-full object-cover"
                                 />
                             </div>
@@ -315,12 +332,17 @@ export default function ProductGrid({ categoryName, globalSearchQuery, onBack, h
                                     </button>
                                     <button
                                         onClick={() => {
-                                            addToCart(selectedProduct); // 1. Кладемо в кошик
-                                            setShowModal(false);        // 2. Закриваємо вікно
+                                            if (!isSelectedInCart) addToCart(selectedProduct);
+                                            setShowModal(false);
                                         }}
-                                        className="w-full bg-white text-blue-600 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border border-blue-100 hover:bg-blue-50 transition-all"
+                                        disabled={isSelectedInCart}
+                                        className={`w-full py-3 rounded-xl font-black uppercase text-[10px] tracking-widest border transition-all ${
+                                            isSelectedInCart
+                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 cursor-default'
+                                                : 'bg-white text-blue-600 border-blue-100 hover:bg-blue-50'
+                                        }`}
                                     >
-                                        Додати та продовжити вибір
+                                        {isSelectedInCart ? 'Додано до кошику' : 'Додати та продовжити вибір'}
                                     </button>
                                 </div>
                             </div>
