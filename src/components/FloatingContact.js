@@ -9,7 +9,7 @@ import WhatsAppIcon from '@/components/icons/WhatsAppIcon';
 export default function FloatingContact() {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
-  
+
   // Оновлений номер брата для Opel.Shrot
   const phoneNumber = "380681374018";
 
@@ -25,18 +25,18 @@ export default function FloatingContact() {
   }, [containerRef]);
 
   return (
-    <div 
-      ref={containerRef} 
-      className="md:hidden fixed bottom-6 right-6 flex flex-col items-center gap-3 z-[9999]"
+    <div
+      ref={containerRef}
+      className="md:hidden fixed right-6 flex flex-col items-center gap-3 z-[9999]"
+      style={{ bottom: 'var(--floating-bottom, 24px)' }}
     >
-      
+
       {/* ПАНЕЛЬ МЕСЕНДЖЕРІВ */}
-      <div className={`flex flex-col gap-4 transition-all duration-300 origin-bottom ${
-        isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-0 opacity-0 translate-y-10 pointer-events-none'
-      }`}>
-        
+      <div className={`flex flex-col gap-4 transition-all duration-300 origin-bottom ${isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-0 opacity-0 translate-y-10 pointer-events-none'
+        }`}>
+
         {/* Viber */}
-        <a 
+        <a
           href={`viber://chat?number=%2B${phoneNumber}`}
           className="w-13 h-13 bg-white text-[#7360f2] rounded-full flex items-center justify-center shadow-xl border border-purple-100 active:scale-90 transition-transform p-3"
         >
@@ -44,7 +44,7 @@ export default function FloatingContact() {
         </a>
 
         {/* WhatsApp */}
-        <a 
+        <a
           href={`https://wa.me/${phoneNumber}`}
           target="_blank"
           className="w-13 h-13 bg-white text-[#25D366] rounded-full flex items-center justify-center shadow-xl border border-green-100 active:scale-90 transition-transform p-3"
@@ -53,7 +53,7 @@ export default function FloatingContact() {
         </a>
 
         {/* Telegram */}
-        <a 
+        <a
           href={`https://t.me/+${phoneNumber}`}
           target="_blank"
           className="w-13 h-13 bg-white text-[#229ED9] rounded-full flex items-center justify-center shadow-xl border border-sky-100 active:scale-90 transition-transform p-3"
@@ -63,11 +63,10 @@ export default function FloatingContact() {
       </div>
 
       {/* ГОЛОВНА КНОПКА (Тригер) */}
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${
-          isOpen ? 'bg-slate-800 rotate-[360deg]' : 'bg-blue-600 shadow-blue-300 animate-bounce-subtle'
-        } text-white`}
+        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${isOpen ? 'bg-slate-800 rotate-[360deg]' : 'bg-blue-600 shadow-blue-300 animate-bounce-subtle'
+          } text-white`}
       >
         {isOpen ? (
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

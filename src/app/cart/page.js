@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
+import { formatNumber } from '@/utils/format';
 
 export default function CartPage() {
   const { cart, removeFromCart, totalAmount } = useCart();
@@ -68,7 +69,7 @@ export default function CartPage() {
                         {item.oe || '—'}
                       </span>
                     </div>
-                    <p className="text-blue-600 font-black text-lg">{item.price}</p>
+                    <p className="text-blue-600 font-black text-lg">{formatNumber(item.price)} грн</p>
                   </div>
                 </Link>
 
@@ -97,7 +98,7 @@ export default function CartPage() {
               <div className="flex justify-between items-end mb-8 border-b border-gray-100 pb-6">
                 <span className="text-slate-400 font-bold uppercase text-xs tracking-widest mb-1">Разом до сплати</span>
                 <span className="text-4xl font-black text-slate-900 tracking-tighter leading-none">
-                  {totalAmount} <span className="text-xl text-slate-400 font-bold">грн</span>
+                  {formatNumber(totalAmount)} <span className="text-xl text-slate-400 font-bold">грн</span>
                 </span>
               </div>
 

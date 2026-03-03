@@ -10,6 +10,7 @@ import TelegramIcon from '@/components/icons/TelegramIcon';
 import WhatsAppIcon from '@/components/icons/WhatsAppIcon';
 import Link from 'next/link'; // <--- Додати
 import { useCart } from '@/context/CartContext'; // <--- Додати
+import { formatPrice } from '@/utils/format';
 
 export default function Header() {
   const { cart } = useCart();
@@ -20,7 +21,7 @@ export default function Header() {
   // Завантажуємо список для пошуку
   useEffect(() => {
     async function fetchForSearch() {
-      const { data } = await supabase.from('products').select('id, name, oe, price, image'); // Додали price та image
+      const { data } = await supabase.from('products').select('id, name, oe_number, price, main_image');
       if (data) setAllProducts(data);
     }
     fetchForSearch();
@@ -95,7 +96,7 @@ export default function Header() {
             <div className="relative group">
               <input
                 type="text"
-                placeholder="Пошук запчастини..."
+                placeholder="Назва або OE номер запчастини..."
                 value={query}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -104,7 +105,7 @@ export default function Header() {
                     // Тепер шукаємо в масиві, який прийшов з бази
                     const filtered = allProducts.filter(p =>
                       (p.name && p.name.toLowerCase().includes(val.toLowerCase())) ||
-                      (p.oe && p.oe.toLowerCase().includes(val.toLowerCase()))
+                      (p.oe_number && p.oe_number.toLowerCase().includes(val.toLowerCase()))
                     ).slice(0, 5);
                     setSuggestions(filtered);
                     setShowSuggestions(true);
@@ -145,23 +146,23 @@ export default function Header() {
                   {suggestions.map((p) => (
                     <div
                       key={p.id}
-                      onClick={() => { setQuery(p.name); performSearch(p.name); }}
+                      onClick={() => { setShowSuggestions(false); router.push(`/product/${p.id}`); }}
                       className="px-6 py-5 md:py-3 hover:bg-blue-50 cursor-pointer flex items-center gap-4 border-b border-slate-50 last:border-0 transition-colors"
                     >
                       {/* Прев'ю */}
                       <div className="w-14 h-14 md:w-10 md:h-10 rounded-xl bg-slate-100 flex-shrink-0 overflow-hidden shadow-sm border border-slate-200">
-                        <img src={p.image} className="w-full h-full object-cover" alt="" />
+                        <img src={p.main_image || 'https://placehold.co/400x400?text=No+Image'} className="w-full h-full object-cover" alt="" />
                       </div>
 
                       {/* Текст */}
                       <div className="flex-grow min-w-0 text-left">
                         <div className="text-base md:text-sm font-black text-slate-900 truncate leading-tight">{p.name}</div>
-                        <div className="text-[11px] md:text-[10px] font-mono font-bold text-slate-400 uppercase mt-1">OE: {p.oe}</div>
+                        <div className="text-[11px] md:text-[10px] font-mono font-bold text-slate-400 uppercase mt-1">OE: {p.oe_number}</div>
                       </div>
 
                       {/* Ціна */}
                       <div className="text-right flex-shrink-0">
-                        <div className="text-base md:text-sm font-black text-blue-600">{p.price}</div>
+                        <div className="text-base md:text-sm font-black text-blue-600">{formatPrice(p.price)}</div>
                         <div className="text-[9px] font-bold text-emerald-600 uppercase md:hidden">В наявності</div>
                       </div>
                     </div>

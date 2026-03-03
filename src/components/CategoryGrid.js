@@ -1,13 +1,15 @@
 "use client";
 
 import React from 'react';
-import { categories } from '../utils/inventoryData'; // Повертаємо імпорт із файлу
 
-export default function CategoryGrid({ onSelectCategory, onBack }) {
+export default function CategoryGrid({ categories = [], onSelectCategory, onBack }) {
+  // Фильтруем только главные категории (у которых parent_id === null)
+  const mainCategories = categories.filter(cat => cat.parent_id === null);
+
   return (
     <section className="py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* Шапка: Кнопка Назад + Заголовок */}
         <div className="mb-6 flex items-center gap-4">
           <button
@@ -26,19 +28,19 @@ export default function CategoryGrid({ onSelectCategory, onBack }) {
           </h2>
         </div>
 
-        {/* СІТКА: Тепер беремо дані безпосередньо з categories (без useState) */}
+        {/* СІТКА: Тепер беремо дані з пропсу categories із бази */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {categories.map((cat) => (
+          {mainCategories.map((cat) => (
             <div
-              key={cat}
-              onClick={() => onSelectCategory(cat)}
+              key={cat.id}
+              onClick={() => onSelectCategory(cat.name)}
               className="group cursor-pointer bg-white border border-gray-200 rounded-xl p-2 h-24 flex items-center justify-center hover:border-blue-600 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 active:scale-95 text-center relative overflow-hidden"
             >
               {/* Ефект підсвітки */}
               <div className="absolute inset-0 bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              
+
               <h3 className="relative z-10 font-bold text-slate-700 group-hover:text-blue-700 text-xs md:text-xs lg:text-sm uppercase tracking-tight leading-snug px-1">
-                {cat}
+                {cat.name}
               </h3>
             </div>
           ))}

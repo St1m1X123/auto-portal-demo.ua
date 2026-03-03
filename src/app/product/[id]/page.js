@@ -12,15 +12,15 @@ export async function generateStaticParams() {
 
 // Генерация мета-тегов для SEO (оставляем как было, это гуд)
 export async function generateMetadata(props) {
-  const params = await props.params; 
+  const params = await props.params;
   const id = params.id;
 
   const { data: product } = await supabase
     .from('products')
-    .select('*')
+    .select('*, category:categories(*)')
     .eq('id', id)
     .single();
-  
+
   const baseUrl = 'https://auto-portal-demo-ua.vercel.app'; // Твой домен
 
   if (!product) {
@@ -31,10 +31,10 @@ export async function generateMetadata(props) {
   }
 
   // Умный выбор картинки
-  const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : product.image;
+  const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : product.main_image;
 
   return {
-    title: `${product.name} (${product.oe}) | Купити в м. Горохів`,
+    title: `${product.name} (${product.oe_number}) | Купити в м. Горохів`,
     description: `Оригінальна запчастина ${product.name}. ID: ${product.id}. Ціна: ${product.price} грн.`,
     openGraph: {
       title: product.name,
@@ -47,11 +47,11 @@ export async function generateMetadata(props) {
 // === ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ===
 export default async function ProductPage(props) {
   const params = await props.params;
-  
+
   // 1. Сервер сам ищет товар
   const { data: product } = await supabase
     .from('products')
-    .select('*')
+    .select('*, category:categories(*)')
     .eq('id', params.id)
     .single();
 

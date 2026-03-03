@@ -24,3 +24,24 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.sidebar-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+/* Thin custom scrollbar for sidebar */
+.custom-scrollbar::-webkit-scrollbar { width: 3px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+/* Sidebar itself */
+aside.md\:flex::-webkit-scrollbar { width: 3px; }
+aside.md\:flex::-webkit-scrollbar-track { background: transparent; }
+aside.md\:flex::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }

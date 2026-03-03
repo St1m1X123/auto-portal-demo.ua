@@ -1,220 +1,169 @@
 "use client";
 
-import React, { useState, Suspense, useEffect } from 'react';
-import BrandGrid from '@/components/BrandGrid';
-import ModelGrid from '@/components/ModelGrid';
-import CategoryGrid from '@/components/CategoryGrid';
+import React, { useState, Suspense, useEffect, useMemo } from 'react';
 import ProductGrid from '@/components/ProductGrid';
-import QuickSearch from '@/components/QuickSearch';
+import LeftSidebar from '@/components/LeftSidebar';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { supabase } from '@/utils/supabase'; // Наш зв'язок з базою
+import { supabase, fetchCategories, fetchProductsWithDetails } from '@/utils/supabase';
+import { formatNumber } from '@/utils/format';
 
 function AutoPortalContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  // --- НОВІ СТАНИ ДЛЯ БАЗИ ДАНИХ ---
-  const [allProducts, setAllProducts] = useState([]); // Тут будуть лежати всі товари з бази
-  const [isLoading, setIsLoading] = useState(true);   // Стан завантаження
+  const pathname = usePathname();
 
-  // Читаємо значення з URL, якщо вони там є
+  // --- ДАНІ З БАЗИ ---
+  const [allProducts, setAllProducts] = useState([]);
+  const [dbCategories, setDbCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // --- ФІЛЬТРИ (всі зберігаємо в одному місці) ---
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get('brand'));
   const [selectedModel, setSelectedModel] = useState(searchParams.get('model'));
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category'));
-  const [showBanner, setShowBanner] = useState(true);
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const searchQuery = searchParams.get('search');
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(40);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [sortBy, setSortBy] = useState('default');
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 1000000 });
+  const [maxPriceInDb, setMaxPriceInDb] = useState(1000000);
+  // Нові фільтри
+  const [condition, setCondition] = useState('all');      // 'all' | 'used' | 'new'
+  const [partBrand, setPartBrand] = useState(null);       // марка виробника
+  const [partType, setPartType] = useState(null);         // тип деталі
+  const [inStockOnly, setInStockOnly] = useState(false);  // тільки в наявності
 
-  // --- 1. ЗАВАНТАЖЕННЯ ТОВАРІВ З SUPABASE ---
+  // --- UI ---
+  const [showVinModal, setShowVinModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(40);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [viewMode, setViewMode] = useState('medium'); // 'large' | 'medium' | 'small'
+
+  // --- Ефект для початкового стану сайдбару (Відкритий тільки на ПК) ---
   useEffect(() => {
-    async function fetchProducts() {
+    if (window.innerWidth >= 768) {
+      setIsSidebarOpen(true);
+    }
+  }, []);
+
+  // --- ЗАВАНТАЖЕННЯ ДАНИХ ---
+  useEffect(() => {
+    async function initData() {
       try {
         setIsLoading(true);
-        // Тягнемо всі товари з таблиці products
-        const { data, error } = await supabase
-          .from('products')
-          .select('*');
-
-        if (error) throw error;
-        setAllProducts(data || []);
+        const [productsData, categoriesData] = await Promise.all([
+          fetchProductsWithDetails(),
+          fetchCategories()
+        ]);
+        setAllProducts(productsData);
+        setDbCategories(categoriesData);
+        if (productsData.length > 0) {
+          const max = Math.max(...productsData.map(p => Number(p.price) || 0));
+          setMaxPriceInDb(max);
+          setPriceRange(prev => ({ ...prev, max: max }));
+        }
       } catch (error) {
-        console.error('Помилка завантаження товарів:', error.message);
+        console.error('Помилка завантаження:', error);
       } finally {
         setIsLoading(false);
       }
     }
-
-    fetchProducts();
+    initData();
   }, []);
 
-  // 2. СИНХРОНІЗАЦІЯ З URL
-  useEffect(() => {
-    // Включаем режим поиска только если есть запрос, загружены товары 
-    // и мы еще НЕ находимся в режиме "Всі запчастини"
-    if (searchQuery && allProducts.length > 0 && selectedCategory !== 'Всі запчастини' && !isTransitioning) {
-      setSelectedBrand('OPEL');
-      setSelectedModel(null);
-      setSelectedCategory('Всі запчастини');
-    }
-
-    // Если поиск очистили вручную — сбрасываем категорию, чтобы можно было выбирать модели
-    if (!searchQuery && selectedCategory === 'Всі запчастини') {
-      setSelectedCategory(null);
-    }
-  }, [searchQuery, allProducts, selectedCategory, isTransitioning]);
-
-  // --- ФУНКЦІЇ ПЕРЕМИКАННЯ (залишаються як були) ---
-  const updateURL = (brand, model, cat) => {
-    const params = new URLSearchParams();
-    if (brand) params.set('brand', brand);
-    if (model) params.set('model', model);
-    if (cat && cat !== 'Всі запчастини') params.set('cat', cat);
-    router.push(`?${params.toString()}`, { scroll: false });
-  };
-
-  // --- 2. ЛОГИКА ОБНОВЛЕНИЯ URL (Функция-помощник) ---
-  const updateUrl = (key, value) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value); else params.delete(key);
-
-    // Если меняем бренд - стираем модель и категорию
-    if (key === 'brand') { params.delete('model'); params.delete('category'); }
-    // Если меняем модель - стираем категорию
-    if (key === 'model') { params.delete('category'); }
-
-    // Записываем в историю браузера
-    router.push(`/?${params.toString()}`, { scroll: false });
-  };
-
-  // --- 3. ОБРАБОТЧИКИ КНОПОК (Мгновенные, без setTimeout) ---
-  const handleSelectBrand = (brand) => {
-    setSelectedBrand(brand);
-    setSelectedModel(null);
-    setSelectedCategory(null);
-    updateUrl('brand', brand);
-  };
-
-  const handleSelectModel = (model) => {
-    setSelectedModel(model);
-    setSelectedCategory(null);
-    updateUrl('model', model);
-  };
-
-  const handleSelectCategory = (category) => {
-    setSelectedCategory(category);
-    updateUrl('category', category);
-  };
-
-  // Кнопки "Назад" внутри интерфейса
-  const handleResetToBrands = () => {
-    setSelectedBrand(null);
-    setSelectedModel(null);
-    setSelectedCategory(null);
-    router.push('/');
-  };
-
-  const handleResetToModels = () => {
-    setSelectedModel(null);
-    setSelectedCategory(null);
-    updateUrl('model', null);
-  };
-
-  const handleResetToCategories = () => {
-    setSelectedCategory(null);
-    updateUrl('category', null);
-  };
-
-  const resetFilters = () => router.push('/');
-
-  // --- ЛОГІКА ФІЛЬТРАЦІЇ ТА СОРТУВАННЯ ---
-  const filteredProducts = allProducts.filter(product => {
-    const pName = (product.name || "").toLowerCase();
-    const pModels = String(product.models || "").toLowerCase().trim();
-    const pOe = (product.oe || "").toLowerCase().trim();
-    const pBrand = String(product.brand || "opel").toLowerCase().trim();
-
-    const brandTarget = (selectedBrand || "").toLowerCase();
-    const modelTarget = (selectedModel || "").toLowerCase();
-    const searchTarget = (searchQuery || "").toLowerCase();
-
-    // Перевірка на універсальність
-    const isUniversal = pModels.includes("всі") || pModels.includes("*") || pBrand === "всі" || pBrand === "universal";
-
-    const matchesBrand = !selectedBrand || pBrand === brandTarget || isUniversal;
-
-    const matchesModel = !selectedModel || pModels.includes(modelTarget) || isUniversal || pName.includes(modelTarget);
-
-    const matchesCategory = !selectedCategory || selectedCategory === 'Всі запчастини' || product.category === selectedCategory;
-
-    const matchesSearch = !searchQuery || pName.includes(searchTarget) || pOe.includes(searchTarget) || pModels.includes(searchTarget);
-
-    return matchesBrand && matchesModel && matchesCategory && matchesSearch;
-  })
-    // 👇 ДОДАЛИ СОРТУВАННЯ: Спочатку "Автоаксесуари та автохімія", потім все інше
-    .sort((a, b) => {
-      const priority = "Автоаксесуари та автохімія";
-      const isA = a.category === priority;
-      const isB = b.category === priority;
-      if (isA && !isB) return -1; // a підняти
-      if (!isA && isB) return 1;  // b підняти
-      return 0; // інакше не міняємо порядок
-    });
-
-  // 👇 ТОВАРИ, ЯКІ БАЧИМО ЗАРАЗ (перші 40, потім 80 і т.д.)
-  const visibleProducts = filteredProducts.slice(0, visibleCount);
-
-  // --- ПОЧАТОК НОВОГО КОДУ: Синхронізація URL ---
-  const pathname = usePathname();
-
-  // 1. Слухаємо URL і оновлюємо фільтри (щоб працювала кнопка Назад)
+  // --- СИНХРОНІЗАЦІЯ URL → стейт (кнопка Назад) ---
   useEffect(() => {
     const brand = searchParams.get('brand');
     const model = searchParams.get('model');
     const category = searchParams.get('category');
-
+    const search = searchParams.get('search') || '';
     if (brand !== selectedBrand) setSelectedBrand(brand);
     if (model !== selectedModel) setSelectedModel(model);
     if (category !== selectedCategory) setSelectedCategory(category);
+    if (search !== searchQuery) setSearchQuery(search);
   }, [searchParams]);
 
-  // 2. Функція для вибору (записує в URL)
-  const selectFilter = (key, value) => {
-    // 1. Миттєво оновлюємо екран (щоб не мигало)
-    if (key === 'brand') setSelectedBrand(value);
-    if (key === 'model') setSelectedModel(value);
-    if (key === 'category') setSelectedCategory(value);
+  // --- ДИНАМІЧНІ ДАНІ ---
+  const dynamicBrands = useMemo(() => {
+    const brandsSet = new Set(allProducts.map(p => (p.car_brand || 'OPEL').toUpperCase()));
+    return Array.from(brandsSet).sort();
+  }, [allProducts]);
 
-    // 2. Записуємо в URL (для кнопки Назад)
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value); else params.delete(key);
+  const dynamicModels = useMemo(() => {
+    if (!selectedBrand) return [];
+    const modelsSet = new Set();
+    allProducts
+      .filter(p => (p.car_brand || 'OPEL').toUpperCase() === selectedBrand.toUpperCase())
+      .forEach(p => {
+        if (Array.isArray(p.compatible_models)) {
+          p.compatible_models.forEach(m => modelsSet.add(m));
+        }
+      });
+    return Array.from(modelsSet).sort();
+  }, [allProducts, selectedBrand]);
 
-    // Чистимо "хвости"
-    if (key === 'brand') { params.delete('model'); params.delete('category'); setSelectedModel(null); setSelectedCategory(null); }
-    if (key === 'model') { params.delete('category'); setSelectedCategory(null); }
-
+  // --- ОНОВЛЕННЯ URL (внутрішня функція) ---
+  const pushUrl = (brand, model, category, search) => {
+    const params = new URLSearchParams();
+    if (brand) params.set('brand', brand);
+    if (model) params.set('model', model);
+    if (category && category !== 'Всі запчастини') params.set('category', category);
+    if (search) params.set('search', search);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  // --- СКРОЛЛ-МЕНЕДЖЕР (Початок) ---
+  // --- HANDLERS ДЛЯ САЙДБАРУ ---
+  const handleBrandChange = (brand) => {
+    setSelectedBrand(brand);
+    setSelectedModel(null);
+    setSelectedCategory(null);
+    pushUrl(brand, null, null, searchQuery);
+  };
+  const handleModelChange = (model) => {
+    setSelectedModel(model);
+    setSelectedCategory(null);
+    pushUrl(selectedBrand, model, null, searchQuery);
+  };
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    pushUrl(selectedBrand, selectedModel, category, searchQuery);
+  };
+  const handleSearchChange = (val) => {
+    setSearchQuery(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('search', val); else params.delete('search');
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+  const handleReset = () => {
+    setSelectedBrand(null);
+    setSelectedModel(null);
+    setSelectedCategory(null);
+    setSearchQuery('');
+    setSortBy('default');
+    setPriceRange({ min: 0, max: maxPriceInDb });
+    setCondition('all');
+    setPartBrand(null);
+    setPartType(null);
+    setInStockOnly(false);
+    router.push('/');
+  };
 
-  // 1. ВІДНОВЛЕННЯ: Коли повернулися на сторінку
+  // --- HANDLERS ДЛЯ НАВІГАЦІЇ (Бренди → Моделі → Категорії) ---
+  const handleSelectBrand = (brand) => { setSelectedBrand(brand); setSelectedModel(null); setSelectedCategory(null); pushUrl(brand, null, null, searchQuery); };
+  const handleSelectModel = (model) => { setSelectedModel(model); setSelectedCategory(null); pushUrl(selectedBrand, model, null, searchQuery); };
+  const handleSelectCategory = (category) => { setSelectedCategory(category); pushUrl(selectedBrand, selectedModel, category, searchQuery); };
+  const handleResetToBrands = () => { setSelectedBrand(null); setSelectedModel(null); setSelectedCategory(null); router.push('/'); };
+  const handleResetToModels = () => { setSelectedModel(null); setSelectedCategory(null); pushUrl(selectedBrand, null, null, searchQuery); };
+  const handleResetToCategories = () => { setSelectedCategory(null); pushUrl(selectedBrand, selectedModel, null, searchQuery); };
+
+  // --- СКРОЛЛ-МЕНЕДЖЕР ---
   useEffect(() => {
-    // Працюємо тільки коли товари вже завантажились
     if (!isLoading && allProducts.length > 0) {
       const savedScroll = sessionStorage.getItem('scrollPosition');
       const savedCount = sessionStorage.getItem('visibleCount');
-
       if (savedScroll && savedCount) {
-        console.log("Відновлюю скролл:", savedScroll);
-        // А. Відновлюємо кількість відкритих товарів (щоб було куди скролити)
         setVisibleCount(parseInt(savedCount));
-
-        // Б. Чекаємо долю секунди, поки товари намалюються, і стрибаємо
         setTimeout(() => {
           window.scrollTo({ top: parseInt(savedScroll), behavior: 'auto' });
-
-          // Чистимо пам'ять (щоб якщо натиснеш F5, тебе не кидало вниз)
           sessionStorage.removeItem('scrollPosition');
           sessionStorage.removeItem('visibleCount');
         }, 100);
@@ -222,247 +171,286 @@ function AutoPortalContent() {
     }
   }, [isLoading, allProducts]);
 
-  // 2. ЗБЕРЕЖЕННЯ: Коли клікаємо на товар
   useEffect(() => {
     const handleProductClick = (e) => {
-      // Перевіряємо, чи клікнув користувач на посилання товару (/product/...)
       const link = e.target.closest('a[href^="/product/"]');
       if (link) {
-        // Записуємо позицію і кількість товарів у "блокнот"
         sessionStorage.setItem('scrollPosition', window.scrollY.toString());
         sessionStorage.setItem('visibleCount', visibleCount.toString());
       }
     };
-
-    // Слухаємо всі кліки на сторінці
     document.addEventListener('click', handleProductClick);
-
-    // Прибираємо слухача, коли йдемо зі сторінки
     return () => document.removeEventListener('click', handleProductClick);
   }, [visibleCount]);
 
-  // --- СКРОЛЛ-МЕНЕДЖЕР (Кінець) ---
+  // --- ФІЛЬТРАЦІЯ З НОВИМИ ФІЛЬТРАМИ ---
+  const filteredProducts = useMemo(() => {
+    // Знаходимо ID вибраної головної категорії для фільтрації товарів з підкатегорій
+    const selectedCatObj = dbCategories?.find(c => c.name === selectedCategory && !c.parent_id);
+    const selectedCatId = selectedCatObj ? selectedCatObj.id : null;
 
-  // Решта коду (return) залишається без змін...
+    return allProducts.filter(product => {
+      const pName = (product.name || "").toLowerCase();
+      const pModels = product.compatible_models || [];
+      const pOe = (product.oe_number || "").toLowerCase().trim();
+      const pBrand = String(product.car_brand || "opel").toLowerCase().trim();
+      const pCondition = (product.condition || "").toLowerCase();
+      const pPartBrand = (product.part_brand || "").toLowerCase();
+
+      const brandTarget = (selectedBrand || "").toLowerCase();
+      const modelTarget = (selectedModel || "").toLowerCase();
+      const searchTarget = (searchQuery || "").toLowerCase();
+
+      const isUniversal = pModels.some(m => m === "всі" || m === "*") || pBrand === "всі" || pBrand === "universal";
+
+      const matchesBrand = !selectedBrand || pBrand === brandTarget || isUniversal;
+      const matchesModel = !selectedModel || pModels.some(m => m.toLowerCase().includes(modelTarget)) || isUniversal || pName.includes(modelTarget);
+
+      // Категорія збігається, якщо ім'я категорії рівне вибраному АБО якщо батьківська категорія вибрана
+      const matchesCategory = !selectedCategory || selectedCategory === 'Всі запчастини' ||
+        (product.category && (product.category.name === selectedCategory || product.category.parent_id === selectedCatId));
+
+      const matchesSearch = !searchQuery ||
+        pName.includes(searchTarget) ||
+        pOe.includes(searchTarget) ||
+        (product.category?.name || "").toLowerCase().includes(searchTarget) || // Шукаємо і по назві підкатегорії
+        pModels.some(m => m.toLowerCase().includes(searchTarget));
+      const matchesPrice = Number(product.price) >= priceRange.min && Number(product.price) <= priceRange.max;
+
+      // Нові фільтри
+      const matchesCondition = condition === 'all' || pCondition === condition;
+      const matchesPartBrand = !partBrand || pPartBrand === partBrand.toLowerCase();
+
+      // Тип деталі (це тепер справжня підкатегорія в базі)
+      const matchesPartType = !partType || (product.category?.name || "").toLowerCase() === partType.toLowerCase();
+
+      const matchesInStock = !inStockOnly || (product.quantity && product.quantity > 0);
+
+      return matchesBrand && matchesModel && matchesCategory && matchesSearch && matchesPrice && matchesCondition && matchesPartBrand && matchesPartType && matchesInStock;
+    }).sort((a, b) => {
+      const priority = "Автоаксесуари та автохімія";
+      const isA = (a.category?.name || "") === priority;
+      const isB = (b.category?.name || "") === priority;
+      if (isA && !isB) return -1;
+      if (!isA && isB) return 1;
+      if (sortBy === 'cheap') return Number(a.price) - Number(b.price);
+      if (sortBy === 'expensive') return Number(b.price) - Number(a.price);
+      return 0;
+    });
+  }, [allProducts, dbCategories, selectedBrand, selectedModel, selectedCategory, searchQuery, priceRange, sortBy, condition, partBrand, partType, inStockOnly]);
+
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
+
+  // --- НОВІ НАДХОДЖЕННЯ ---
+  const newArrivals = useMemo(() => {
+    return [...allProducts]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 10);
+  }, [allProducts]);
+
+  // --- РЕНДЕР ---
   return (
     <div className="bg-gray-50 text-slate-900 font-sans min-h-screen">
-      <main>
-        {/* Хедер / Hero */}
-        <section className="py-16 px-4 bg-white border-b border-gray-100">
-          <div className="max-w-7xl mx-auto text-center">
-            <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6 uppercase tracking-tighter">
-              Авто<span className="text-blue-600">портал</span>
-            </h1>
-            <p className="text-lg text-slate-500 max-w-2xl mx-auto font-medium">
-              Швидкий пошук запчастин для вашого авто
-            </p>
-          </div>
-        </section>
+      {/* === MOBILE FILTER BUTTON === sticky below header (Top Bar ~36px + Header 64px = 100px) */}
+      <div className="md:hidden sticky top-[100px] z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-2 flex items-center justify-between">
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="flex items-center gap-2 px-10 py-2 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-slate-200"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          Фільтри
+          {filteredProducts.length > 0 && (
+            <span className="bg-blue-500 text-white px-1.5 py-0.5 rounded-md ml-1 text-[8px]">
+              {filteredProducts.length}
+            </span>
+          )}
+        </button>
 
-        {/* --- ЧИСТИЙ БЛОК ПОШУКУ (ПРАВИЛЬНИЙ) --- */}
-        {searchQuery ? (
-          <section className="py-12 px-4">
-            <div className="max-w-6xl mx-auto">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+          {[{ v: 'large', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+          { v: 'medium', icon: 'M3 5h4v4H3V5zm6 0h4v4H9V5zm6 0h4v4h-4V5zM3 11h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4zM3 17h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4z' },
+          { v: 'small', icon: 'M3 4h2v2H3V4zm4 0h2v2H7V4zm4 0h2v2h-2V4zm4 0h2v2h-2V4zM3 8h2v2H3V8zm4 0h2v2H7V8zm4 0h2v2h-2V8zm4 0h2v2h-2V8zM3 12h2v2H3v-2zm4 0h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z' }].map(({ v, icon }) => (
+            <button key={v} onClick={() => setViewMode(v)} className={`p-1 rounded transition-all ${viewMode === v ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}>
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d={icon} />
+              </svg>
+            </button>
+          ))}
+        </div>
+      </div>
 
-              <div className="mb-8">
-                {/* 1. Якщо нічого не вибрано - показуємо БРЕНДИ */}
-                {!selectedBrand && !searchQuery ? (
-                  <BrandGrid onSelectBrand={(brand) => selectFilter('brand', brand)} />
-                ) :
-                  /* 2. Якщо вибрали Бренд - показуємо МОДЕЛІ */
-                  selectedBrand && !selectedModel ? (
-                    <ModelGrid
-                      brand={selectedBrand}
-                      onSelectModel={(model) => selectFilter('model', model)}
-                      onBack={() => selectFilter('brand', null)}
-                    />
-                  ) :
-                    /* 3. Якщо вибрали Модель - показуємо КАТЕГОРІЇ */
-                    selectedModel && (!selectedCategory || selectedCategory === 'Всі запчастини') ? (
-                      <CategoryGrid
-                        onSelectCategory={(cat) => selectFilter('category', cat)}
-                        onBack={() => selectFilter('model', null)}
-                      />
-                    ) : null}
-              </div>
+      {/* === MAIN LAYOUT: sidebar + content === */}
+      <div className="flex min-h-screen relative">
 
-              {/* Оживляємо стандартну кнопку Назад всередині ProductGrid */}
-              <ProductGrid
-                products={filteredProducts}
-                categoryName="Всі запчастини"
-                globalSearchQuery={searchQuery}
-                onBack={handleResetToBrands} // <--- Оце саме те, що ти просив!
-              />
+        {/* LEFT SIDEBAR */}
+        <LeftSidebar
+          allProducts={allProducts}
+          dbCategories={dbCategories}
+          availableBrands={dynamicBrands}
+          selectedBrand={selectedBrand}
+          selectedModel={selectedModel}
+          selectedCategory={selectedCategory}
+          searchQuery={searchQuery}
+          sortBy={sortBy}
+          priceRange={priceRange}
+          maxPrice={maxPriceInDb || 100000}
+          condition={condition}
+          partBrand={partBrand}
+          partType={partType}
+          inStockOnly={inStockOnly}
+          onBrandChange={handleBrandChange}
+          onModelChange={handleModelChange}
+          onCategoryChange={handleCategoryChange}
+          onSearchChange={handleSearchChange}
+          onSortChange={setSortBy}
+          onPriceChange={setPriceRange}
+          onConditionChange={setCondition}
+          onPartBrandChange={setPartBrand}
+          onPartTypeChange={setPartType}
+          onInStockChange={setInStockOnly}
+          onReset={handleReset}
+          onOpenVin={() => setShowVinModal(true)}
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen(prev => !prev)}
+        />
 
-            </div>
-          </section>
-        ) : (
-          <>
-            <QuickSearch
-              // 1. Передаємо базу даних (тепер список підкатегорій буде живим)
-              allProducts={allProducts}
+        {/* MAIN CONTENT */}
+        <main className="flex-1 min-w-0 px-4 md:px-8 py-4 md:py-6 pb-20">
 
-              // 2. Передаємо початкові значення (щоб поля не збивались)
-              initialBrand={selectedBrand}
-              initialModel={selectedModel}
-              initialCategory={selectedCategory}
-              initialSearch={searchQuery}
-
-              // 3. Обробка натискання кнопки "Пошук"
-              onSearch={(brand, model, cat, partName) => {
-                setIsTransitioning(true);
-                const params = new URLSearchParams();
-
-                // Формуємо посилання
-                if (brand) params.set('brand', brand);
-                if (model) params.set('model', model);
-                if (cat && cat !== 'Всі запчастини') params.set('category', cat);
-
-                // ВАЖЛИВО: Якщо вибрали "Тип деталі" (partName), записуємо це в search
-                if (partName) params.set('search', partName);
-
-                router.push(`/?${params.toString()}`);
-
-                // Плавне оновлення стейту
-                setTimeout(() => {
-                  setSelectedBrand(brand);
-                  setSelectedModel(model);
-                  setSelectedCategory(cat);
-                  setIsTransitioning(false);
-                }, 300);
-              }}
-            />
-
-            {/* >>> БАНЕР (ВИПРАВЛЕНИЙ: Великий шрифт, зручний хрестик) <<< */}
-            {!selectedBrand && showBanner && (
-              <div className="max-w-6xl mx-auto px-4 mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="bg-white border border-blue-100 rounded-xl p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm shadow-blue-50 relative">
-
-                  {/* Хрестик (Максимально в кутку) */}
-                  <button
-                    onClick={() => setShowBanner(false)}
-                    // Було: top-3 right-3 p-2. Стало: top-1 right-1 p-1.
-                    className="absolute top-1 right-1 text-slate-400 hover:text-red-500 hover:bg-slate-50 rounded-full p-1 transition-all"
-                    title="Закрити"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-
-                  <div className="flex items-center gap-4 text-center md:text-left pr-8">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-lg text-white shrink-0 shadow-sm">
-                      📦
-                    </div>
-                    <div>
-                      {/* Заголовок (Збільшив шрифт до text-sm) */}
-                      <h3 className="font-bold text-slate-900 text-sm uppercase tracking-tight mb-1">
-                        Не знайшли запчастину?
-                      </h3>
-                      {/* Опис (Збільшив шрифт до text-xs) */}
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed max-w-lg">
-                        Ми можемо знайти та привезти деталь для <span className="text-blue-600 font-bold">будь-якої моделі Opel</span>.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Кнопка */}
-                  {/* КНОПКА (тепер відкриває вікно) */}
-                  <button
-                    onClick={() => setShowOrderModal(true)}
-                    className="whitespace-nowrap bg-blue-600 text-white px-6 py-3 rounded-lg font-bold uppercase text-[11px] tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-100 active:scale-95 w-full md:w-auto text-center"
-                  >
-                    Замовити
-                  </button>
-                </div>
-              </div>
+          {/* Breadcrumbs */}
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <span className="hover:text-blue-600 cursor-pointer transition-colors" onClick={handleReset}>Головна</span>
+            {selectedBrand && (
+              <>
+                <svg className="w-2.5 h-2.5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                <span className="hover:text-blue-600 cursor-pointer transition-colors" onClick={() => handleBrandChange(selectedBrand)}>{selectedBrand}</span>
+              </>
             )}
+            {selectedModel && (
+              <>
+                <svg className="w-2.5 h-2.5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                <span className="hover:text-blue-600 cursor-pointer transition-colors" onClick={() => handleModelChange(selectedModel)}>{selectedModel}</span>
+              </>
+            )}
+            {selectedCategory && (
+              <>
+                <svg className="w-2.5 h-2.5 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                <span className="text-slate-600">{selectedCategory}</span>
+              </>
+            )}
+          </div>
 
-            <div className="max-w-6xl mx-auto px-4 py-4">
-              <nav className="text-xs sm:text-sm font-bold flex flex-wrap items-center gap-1 sm:gap-2 text-slate-400 uppercase tracking-widest">
-                {/* Хрестик (Максимально в кутку) */}
-                <button
-                  onClick={() => setShowBanner(false)}
-                  // Було: top-3 right-3 p-2. Стало: top-1 right-1 p-1.
-                  className="absolute top-1 right-1 text-slate-400 hover:text-red-500 hover:bg-slate-50 rounded-full p-1 transition-all"
-                  title="Закрити"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          {/* === РОЗДІЛЬНИК === */}
+          <div className="flex items-center gap-4 my-5">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+              Всі запчастини
+            </span>
+            <div className="flex-1 h-px bg-slate-200" />
+
+            {/* Перемикач виду */}
+            <div className="hidden md:flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shrink-0">
+              {[{ v: 'large', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', title: 'Великий' }, { v: 'medium', icon: 'M3 5h4v4H3V5zm6 0h4v4H9V5zm6 0h4v4h-4V5zM3 11h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4zM3 17h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4z', title: 'Середній' }, { v: 'small', icon: 'M3 4h2v2H3V4zm4 0h2v2H7V4zm4 0h2v2h-2V4zm4 0h2v2h-2V4zM3 8h2v2H3V8zm4 0h2v2H7V8zm4 0h2v2h-2V8zm4 0h2v2h-2V8zM3 12h2v2H3v-2zm4 0h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z', title: 'Компактний' }].map(({ v, icon, title }) => (
+                <button key={v} onClick={() => setViewMode(v)} title={title}
+                  className={`p-1.5 rounded transition-all ${viewMode === v ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d={icon} /></svg>
                 </button>
-                {selectedBrand && (
-                  <><span>/</span><button onClick={handleResetToModels} className={`hover:text-blue-600 transition ${!selectedModel ? 'text-blue-600' : ''}`}>{selectedBrand}</button></>
-                )}
-                {selectedModel && (
-                  <><span>/</span><button onClick={handleResetToCategories} className={`hover:text-blue-600 transition ${!selectedCategory ? 'text-blue-600' : ''}`}>{selectedModel}</button></>
-                )}
-                {selectedCategory && (
-                  <><span>/</span><span className="text-slate-900">{selectedCategory}</span></>
-                )}
-              </nav>
+              ))}
             </div>
+          </div>
 
-            <div className={`transition-opacity duration-300 min-h-[450px] ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+          {/* === СПИСОК ТОВАРІВ === */}
+          <ProductGrid
+            products={visibleProducts}
+            categoryName={selectedCategory || "Всі запчастини"}
+            hideHeader={true}
+            globalSearchQuery={searchQuery}
+            onOpenVin={() => setShowVinModal(true)}
+            isLoading={isLoading}
+            maxPrice={maxPriceInDb || 100000}
+            totalCount={filteredProducts.length}
+            viewMode={viewMode}
+          />
 
-              {/* 1. БЛОК ФІЛЬТРІВ (Грід Брендів / Моделей / Категорій) */}
-              <div className="mb-8">
-                {!selectedBrand ? (
-                  <BrandGrid onSelectBrand={handleSelectBrand} />
-                ) : !selectedModel ? (
-                  <ModelGrid brand={selectedBrand} onSelectModel={handleSelectModel} onBack={handleResetToBrands} />
-                ) : (!selectedCategory || selectedCategory === 'Всі запчастини') ? (
-                  <CategoryGrid onSelectCategory={handleSelectCategory} onBack={handleResetToModels} />
-                ) : null}
-              </div>
-
-              {/* 3. СПИСОК ТОВАРІВ */}
-              <ProductGrid
-                products={visibleProducts}
-                categoryName={selectedCategory || "Всі запчастини"}
-                hideHeader={false}
-                onBack={handleResetToCategories}
-              />
-              {/* 4. КНОПКА "ПОКАЗАТИ ЩЕ" */}
-              {visibleCount < filteredProducts.length && (
-                <div className="mt-12 text-center pb-8">
-                  <button
-                    onClick={() => setVisibleCount(prev => prev + 40)}
-                    className="bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-8 py-3 rounded-xl font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg"
-                  >
-                    Показати ще ({filteredProducts.length - visibleCount})
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-      </main>
-      {/* --- МОДАЛЬНЕ ВІКНО "ЗАМОВИТИ ПІДБІР" --- */}
-      {showOrderModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 font-montserrat">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowOrderModal(false)} />
-          <div className="relative bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-
-            {/* Заголовок */}
-            <div className="bg-slate-50 px-8 py-6 border-b border-slate-100">
-              <h3 className="text-xl font-black text-slate-800 uppercase leading-tight mb-1">Запит на підбір</h3>
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Ми знайдемо потрібну деталь для вашого Opel</p>
-            </div>
-
-            {/* Поля форми */}
-            <div className="p-8 overflow-y-auto space-y-6">
-              <div className="space-y-4">
-                <input type="text" placeholder="Ваше ім'я" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm" />
-                <input type="tel" placeholder="Номер телефону" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm" />
-                <textarea rows="3" placeholder="Яка деталь вам потрібна? (Модель, рік, назва...)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm resize-none"></textarea>
-              </div>
-              <button className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-blue-100 active:scale-95 transition-all hover:bg-blue-700">
-                Надіслати запит
+          {/* Кнопка "Показати ще" */}
+          {visibleCount < filteredProducts.length && (
+            <div className="mt-12 text-center pb-8">
+              <button
+                onClick={() => setVisibleCount(prev => prev + 40)}
+                className="bg-white border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white px-8 py-3 rounded-xl font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg"
+              >
+                Показати ще ({filteredProducts.length - visibleCount})
               </button>
             </div>
+          )}
 
-            {/* Кнопка закриття */}
-            <button onClick={() => setShowOrderModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 rounded-full p-2 transition-all shadow-sm border border-slate-100">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+          {/* === НОВІ НАДХОДЖЕННЯ === */}
+          {!selectedBrand && !selectedModel && !searchQuery && newArrivals.length > 0 && (
+            <section className="bg-white rounded-3xl border border-slate-100 shadow-sm py-8 px-6 mt-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3">
+                  <span className="w-1.5 h-6 bg-blue-600 rounded-full" />
+                  Свіжий розбір
+                  <div className="bg-blue-600 text-white text-[9px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    NEW
+                  </div>
+                </h2>
+                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full hidden sm:block">
+                  Останні 10 надходжень
+                </span>
+              </div>
+              <div className="flex overflow-x-auto custom-scrollbar gap-3 pb-4 snap-x">
+                {newArrivals.map(p => (
+                  <div key={p.id} onClick={() => router.push(`/product/${p.id}`)} className="snap-start shrink-0 w-[140px] md:w-[150px] group bg-slate-50 rounded-2xl p-2 md:p-2.5 border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer">
+                    <div className="aspect-square rounded-xl overflow-hidden bg-white mb-2 relative">
+                      <img src={p.main_image || 'https://placehold.co/400x400?text=No+Image'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+                      <div className="absolute top-1.5 left-1.5 bg-blue-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md shadow">New</div>
+                    </div>
+                    <h3 className="text-[10px] md:text-[11px] font-bold text-slate-800 line-clamp-2 leading-snug mb-1">{p.name}</h3>
+                    <span className="text-[11px] md:text-xs font-black text-blue-600">{formatNumber(p.price)} <span className="text-slate-400 font-bold text-[8px] uppercase">грн</span></span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+        </main>
+      </div>
+
+      {/* === МОДАЛЬНЕ ВІКНО "ЗАМОВЛЕННЯ" === */}
+      {showVinModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowVinModal(false)} />
+          <div className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300">
+            <div className="bg-slate-900 px-8 py-8 text-white relative">
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-2">Найдемо <span className="text-blue-400">під замовлення</span></h3>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-relaxed">Якщо деталі немає в каталозі — ми її знайдемо для вас</p>
+              <button onClick={() => setShowVinModal(false)} className="absolute top-6 right-6 text-white/50 hover:text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <form className="p-8 space-y-5">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block">Яка деталь потрібна? (Обов'язково)</label>
+                  <textarea rows="2" placeholder="Наприклад: Бампер передній Opel Astra G" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all resize-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block">Ваш VIN-код (Необов'язково)</label>
+                  <input type="text" placeholder="XWF1234567890ABCD" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all font-mono uppercase" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block">Номер телефону (Обов'язково)</label>
+                  <input type="tel" placeholder="+38 (0__) ___ __ __" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all" />
+                </div>
+              </div>
+              <button type="button" onClick={() => { alert('Дякуємо! Ми вже почали пошук. Передзвонимо вам найближчим часом.'); setShowVinModal(false); }} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-blue-100 active:scale-95 transition-all hover:bg-blue-700">
+                Дізнатися ціну та термін
+              </button>
+            </form>
           </div>
         </div>
       )}
